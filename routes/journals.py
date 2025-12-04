@@ -1,0 +1,212 @@
+from fastapi import APIRouter, HTTPException
+from pydantic import BaseModel
+from typing import List, Optional
+from database import supabase
+from datetime import datetime
+
+router = APIRouter()
+
+class JournalLineCreate(BaseModel):
+    account_id: str
+    debit: Optional[float] = 0.0
+    credit: Optional[float] = 0.0
+    description: Optional[str] = None
+    contact_id: Optional[str] = None
+    tags: Optional[List[str]] = None
+
+class JournalEntryCreate(BaseModel):
+    company_id: str
+    entry_date: str
+    memo: Optional[str] = None
+    reference: Optional[str] = None
+    lines: List[JournalLineCreate]
+
+class JournalEntryUpdate(BaseModel):
+    entry_date: Optional[str] = None
+    memo: Optional[str] = None
+    reference: Optional[str] = None
+    status: Optional[str] = None
+
+@router.get("/")
+def get_all_journal_entries():
+    """Get all journal entries"""
+    response = supabase.table("journal_entries")\
+        .select("*, journal_lines(*, accounts(account_code, account_name))")\
+        .execute()
+    return response.data
+
+@router.get("/company/{company_id}")
+def get_company_journal_entries(company_id: str, limit: int = 50, offset: int = 0):
+    """Get journal entries for a specific company"""
+    response = supabase.table("journal_entries")\
+        .select("*, journal_lines(*, accounts(account_code, account_name))")\
+        .eq("company_id", company_id)\
+        .order("entry_date", desc=True)\
+        .order("created_at", desc=True)\
+        .range(offset, offset + limit - 1)\
+        .execute()
+    return response.data
+
+@router.get("/{journal_id}")
+def get_journal_entry(journal_id: str):
+    """Get a specific journal entry with its lines"""
+    response = supabase.table("journal_entries")\
+        .select("*, journal_lines(*, accounts(account_code, account_name))")\
+        .eq("id", journal_id)\
+        .single()\
+        .execute()
+
+    if not response.data:
+        raise HTTPException(status_code=404, detail="Journal entry not found")
+
+    return response.data
+
+@router.post("/")
+def create_journal_entry(entry: JournalEntryCreate):
+    """Create a new journal entry with lines"""
+    # Validate that debits equal credits
+    total_debit = sum(line.debit or 0 for line in entry.lines)
+    total_credit = sum(line.credit or 0 for line in entry.lines)
+
+    if abs(total_debit - total_credit) > 0.01:  # Allow for small floating point differences
+        raise HTTPException(
+            status_code=400,
+            detail=f"Debits ({total_debit}) must equal credits ({total_credit})"
+        )
+
+    # Generate journal number
+    # Get the count of journal entries for this company to generate the next number
+    year = datetime.strptime(entry.entry_date, "%Y-%m-%d").year
+    count_response = supabase.table("journal_entries")\
+        .select("id", count="exact")\
+        .eq("company_id", entry.company_id)\
+        .execute()
+
+    next_number = (count_response.count or 0) + 1
+    journal_number = f"JE-{year}-{next_number:04d}"
+
+    # Create journal entry
+    journal_data = {
+        "company_id": entry.company_id,
+        "journal_number": journal_number,
+        "entry_date": entry.entry_date,
+        "memo": entry.memo,
+        "reference": entry.reference,
+        "status": "posted",
+        "total_debit": total_debit,
+        "total_credit": total_credit,
+        "is_balanced": True
+    }
+
+    journal_response = supabase.table("journal_entries")\
+        .insert(journal_data)\
+        .execute()
+
+    if not journal_response.data:
+        raise HTTPException(status_code=400, detail="Failed to create journal entry")
+
+    journal_entry = journal_response.data[0]
+
+    # Create journal lines
+    for line in entry.lines:
+        line_data = {
+            "journal_entry_id": journal_entry["id"],
+            "account_id": line.account_id,
+            "debit": line.debit or 0.0,
+            "credit": line.credit or 0.0,
+            "description": line.description,
+            "contact_id": line.contact_id,
+            "tags": line.tags
+        }
+
+        supabase.table("journal_lines").insert(line_data).execute()
+
+        # Update account balance
+        account_response = supabase.table("accounts")\
+            .select("balance, type")\
+            .eq("id", line.account_id)\
+            .single()\
+            .execute()
+
+        if account_response.data:
+            account = account_response.data
+            current_balance = account.get("balance", 0) or 0
+            account_type = account.get("type", "")
+
+            # Calculate new balance based on account type
+            # Debit increases: Assets, Expenses
+            # Credit increases: Liabilities, Equity, Revenue
+            if account_type in ["asset", "expense"]:
+                new_balance = current_balance + (line.debit or 0) - (line.credit or 0)
+            else:  # liability, equity, revenue
+                new_balance = current_balance + (line.credit or 0) - (line.debit or 0)
+
+            supabase.table("accounts")\
+                .update({"balance": new_balance})\
+                .eq("id", line.account_id)\
+                .execute()
+
+    # Fetch the complete entry with lines
+    return get_journal_entry(journal_entry["id"])
+
+@router.patch("/{journal_id}")
+def update_journal_entry(journal_id: str, entry: JournalEntryUpdate):
+    """Update a journal entry (header only, not lines)"""
+    update_data = {k: v for k, v in entry.dict().items() if v is not None}
+
+    if not update_data:
+        raise HTTPException(status_code=400, detail="No fields to update")
+
+    response = supabase.table("journal_entries")\
+        .update(update_data)\
+        .eq("id", journal_id)\
+        .execute()
+
+    if not response.data:
+        raise HTTPException(status_code=404, detail="Journal entry not found")
+
+    return response.data[0]
+
+@router.delete("/{journal_id}")
+def delete_journal_entry(journal_id: str):
+    """Delete a journal entry and its lines (reverse account balances)"""
+    # Get the journal entry with lines
+    entry = get_journal_entry(journal_id)
+
+    # Reverse the account balances
+    for line in entry.get("journal_lines", []):
+        account_response = supabase.table("accounts")\
+            .select("balance, type")\
+            .eq("id", line["account_id"])\
+            .single()\
+            .execute()
+
+        if account_response.data:
+            account = account_response.data
+            current_balance = account.get("balance", 0) or 0
+            account_type = account.get("type", "")
+
+            # Reverse the transaction
+            if account_type in ["asset", "expense"]:
+                new_balance = current_balance - (line["debit"] or 0) + (line["credit"] or 0)
+            else:
+                new_balance = current_balance - (line["credit"] or 0) + (line["debit"] or 0)
+
+            supabase.table("accounts")\
+                .update({"balance": new_balance})\
+                .eq("id", line["account_id"])\
+                .execute()
+
+    # Delete journal lines first
+    supabase.table("journal_lines")\
+        .delete()\
+        .eq("journal_entry_id", journal_id)\
+        .execute()
+
+    # Delete journal entry
+    supabase.table("journal_entries")\
+        .delete()\
+        .eq("id", journal_id)\
+        .execute()
+
+    return {"message": "Journal entry deleted successfully"}
