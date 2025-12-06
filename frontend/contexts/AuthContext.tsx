@@ -1,9 +1,10 @@
 'use client'
 
-import React, { createContext, useContext, useEffect, useState } from 'react'
+import React, { createContext, useContext, useEffect, useState, useCallback } from 'react'
 import { User as SupabaseUser } from '@supabase/supabase-js'
 import { supabase, User, Company } from '@/lib/supabase'
 import { useRouter } from 'next/navigation'
+import { api } from '@/lib/api'
 
 interface AuthContextType {
   user: User | null
@@ -17,6 +18,7 @@ interface AuthContextType {
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined)
+const demoMode = process.env.NEXT_PUBLIC_DEMO_MODE === 'true'
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null)
@@ -26,6 +28,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const router = useRouter()
 
   const fetchUserData = async (authUser: SupabaseUser) => {
+    if (!supabase) return
     try {
       // Fetch user data from the users table
       const { data: userData, error: userError } = await supabase
@@ -54,8 +57,41 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   }
 
+  const initializeDemoContext = useCallback(async () => {
+    setLoading(true)
+    try {
+      const response = await api.get('/companies/')
+      const firstCompany = response.data?.[0] || null
+      setCompany(firstCompany)
+      setUser({
+        id: 'demo-user',
+        email: 'demo@endless.finance',
+        full_name: 'Demo User',
+        role: 'admin',
+        company_id: firstCompany?.id ?? null,
+        created_at: new Date().toISOString()
+      })
+    } catch (error) {
+      console.error('Demo mode: failed to fetch companies', error)
+      setUser(null)
+      setCompany(null)
+    } finally {
+      setLoading(false)
+    }
+  }, [])
+
   useEffect(() => {
-    // Check active session
+    if (demoMode) {
+      initializeDemoContext()
+      return
+    }
+
+    if (!supabase) {
+      console.error('Supabase client is not configured. Set NEXT_PUBLIC_SUPABASE_URL / KEY or enable demo mode.')
+      setLoading(false)
+      return
+    }
+
     supabase.auth.getSession().then(({ data: { session } }) => {
       setSupabaseUser(session?.user ?? null)
       if (session?.user) {
@@ -64,7 +100,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setLoading(false)
     })
 
-    // Listen for auth changes
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange((_event, session) => {
@@ -79,9 +114,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     })
 
     return () => subscription.unsubscribe()
-  }, [])
+  }, [initializeDemoContext])
 
   const signUp = async (email: string, password: string, fullName: string) => {
+    if (demoMode || !supabase) {
+      throw new Error('Authentication is disabled in demo mode.')
+    }
     try {
       const { data, error } = await supabase.auth.signUp({
         email,
@@ -127,6 +165,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }
 
   const signIn = async (email: string, password: string) => {
+    if (demoMode || !supabase) {
+      throw new Error('Authentication is disabled in demo mode.')
+    }
     try {
       const { data, error } = await supabase.auth.signInWithPassword({
         email,
@@ -159,6 +200,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }
 
   const signOut = async () => {
+    if (demoMode || !supabase) {
+      setUser(null)
+      setCompany(null)
+      return
+    }
     try {
       const { error } = await supabase.auth.signOut()
       if (error) throw error
@@ -171,6 +217,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }
 
   const refreshUser = async () => {
+    if (demoMode) {
+      await initializeDemoContext()
+      return
+    }
     if (supabaseUser) {
       await fetchUserData(supabaseUser)
     }

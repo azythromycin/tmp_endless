@@ -2,25 +2,41 @@
 
 import { useState, useEffect } from "react";
 import Table from "@/components/Table";
-import { api, COMPANY_ID } from "@/lib/api";
+import { api } from "@/lib/api";
 
 export default function JournalsPage() {
+  const [companyId, setCompanyId] = useState<string | null>(null);
   const [journals, setJournals] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
   useEffect(() => {
-    loadJournals();
+    const fetchCompany = async () => {
+      try {
+        const companies = await api.get('/companies/')
+        if (companies.data && companies.data.length > 0) {
+          setCompanyId(companies.data[0].id)
+        }
+      } catch (error) {
+        console.error('Failed to fetch company:', error)
+      }
+    }
+    fetchCompany()
   }, []);
 
+  useEffect(() => {
+    if (companyId) {
+      loadJournals();
+    }
+  }, [companyId]);
+
   const loadJournals = async () => {
+    if (!companyId) return;
     try {
       setLoading(true);
-      // Note: If a specific journal endpoint exists, use it here
-      // For now, we'll show a placeholder message
       setError("");
-      // Placeholder: In a real app, you'd fetch from /journals/company/{company_id}
-      setJournals([]);
+      const response = await api.get(`/journals/company/${companyId}`);
+      setJournals(response || []);
     } catch (err: any) {
       setError(err.message);
     } finally {
@@ -75,17 +91,47 @@ export default function JournalsPage() {
             </div>
           </div>
         ) : (
-          <Table
-            headers={["Date", "Description", "Debit", "Credit", "Status"]}
-            rows={journals.map((j) => [
-              j.entry_date,
-              j.memo,
-              j.debit ? `$${j.debit.toFixed(2)}` : "-",
-              j.credit ? `$${j.credit.toFixed(2)}` : "-",
-              j.status,
-            ])}
-            emptyMessage="No journal entries found"
-          />
+          <div className="space-y-4">
+            {journals.map((journal) => (
+              <div key={journal.id} className="border dark:border-neutral-700 rounded-lg p-4 space-y-3">
+                <div className="flex justify-between items-start">
+                  <div>
+                    <div className="font-semibold text-gray-900 dark:text-white">{journal.journal_number}</div>
+                    <div className="text-sm text-gray-600 dark:text-gray-400">{journal.entry_date}</div>
+                    <div className="text-sm text-gray-700 dark:text-gray-300 mt-1">{journal.memo}</div>
+                  </div>
+                  <div className="text-right">
+                    <div className="text-sm font-medium text-gray-900 dark:text-white">
+                      ${journal.total_debit?.toFixed(2) || '0.00'}
+                    </div>
+                    <div className="text-xs text-gray-500 dark:text-gray-400">
+                      {journal.is_balanced ? '✓ Balanced' : '⚠ Unbalanced'}
+                    </div>
+                  </div>
+                </div>
+                {journal.journal_lines && journal.journal_lines.length > 0 && (
+                  <div className="border-t dark:border-neutral-700 pt-3 space-y-2">
+                    <div className="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Lines</div>
+                    {journal.journal_lines.map((line: any, idx: number) => (
+                      <div key={idx} className="flex justify-between text-sm pl-4">
+                        <div className="text-gray-700 dark:text-gray-300">
+                          {line.accounts?.account_name || line.description}
+                        </div>
+                        <div className="flex gap-6">
+                          <div className="w-24 text-right">
+                            {line.debit > 0 ? `$${line.debit.toFixed(2)}` : '-'}
+                          </div>
+                          <div className="w-24 text-right">
+                            {line.credit > 0 ? `$${line.credit.toFixed(2)}` : '-'}
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
         )}
       </div>
 

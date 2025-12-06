@@ -1,13 +1,24 @@
-import { createClient } from '@supabase/supabase-js'
+import { createClient, SupabaseClient } from '@supabase/supabase-js'
 
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
-const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+const demoMode = process.env.NEXT_PUBLIC_DEMO_MODE === 'true'
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || ''
+const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || ''
+
+let supabaseClient: SupabaseClient | null = null
 
 if (!supabaseUrl || !supabaseAnonKey) {
-  throw new Error('Missing Supabase environment variables')
+  if (!demoMode) {
+    throw new Error('Missing Supabase environment variables')
+  } else {
+    if (typeof window !== 'undefined') {
+      console.warn('Supabase credentials missing. Running frontend in demo mode.')
+    }
+  }
+} else {
+  supabaseClient = createClient(supabaseUrl, supabaseAnonKey)
 }
 
-export const supabase = createClient(supabaseUrl, supabaseAnonKey)
+export const supabase = supabaseClient
 
 export type User = {
   id: string

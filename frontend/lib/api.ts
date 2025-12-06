@@ -8,6 +8,12 @@ export const api = {
     (await axios.get(API_BASE + url, { params })).data,
   post: async <T = any>(url: string, body?: any): Promise<T> =>
     (await axios.post(API_BASE + url, body)).data,
+  patch: async <T = any>(url: string, body?: any): Promise<T> =>
+    (await axios.patch(API_BASE + url, body)).data,
+  put: async <T = any>(url: string, body?: any): Promise<T> =>
+    (await axios.put(API_BASE + url, body)).data,
+  delete: async <T = any>(url: string): Promise<T> =>
+    (await axios.delete(API_BASE + url)).data,
   postFormData: async <T = any>(url: string, formData: FormData): Promise<T> =>
     (await axios.post(API_BASE + url, formData, {
       headers: { "Content-Type": "multipart/form-data" }

@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import {
   User,
   Building2,
@@ -8,10 +8,10 @@ import {
   Phone,
   MapPin,
   Calendar,
-  Settings,
   LogOut,
   Save,
-  Upload
+  Upload,
+  AlertCircle
 } from 'lucide-react'
 import { useAuth } from '@/contexts/AuthContext'
 import { api } from '@/lib/api'
@@ -120,96 +120,152 @@ export default function Profile() {
     await signOut()
   }
 
+  const initials = useMemo(() => {
+    const source = personalInfo.fullName || companyInfo.name || 'Endless'
+    return source
+      .split(' ')
+      .filter(Boolean)
+      .map(word => word[0]?.toUpperCase())
+      .slice(0, 2)
+      .join('') || 'EN'
+  }, [personalInfo.fullName, companyInfo.name])
+
+  const inputStyles = 'mt-2 w-full rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-sm text-white placeholder:text-white/40 focus:outline-none focus:ring-2 focus:ring-fuchsia-500/40'
+  const labelStyles = 'text-xs uppercase tracking-[0.35em] text-white/50'
+
   return (
-    <div className="p-8 space-y-6">
-      {/* Header */}
-      <div>
-        <h1 className="text-3xl font-bold text-gray-900">Settings</h1>
-        <p className="text-gray-600 mt-1">Manage your profile and company settings</p>
-      </div>
-
-      {/* Tabs */}
-      <div className="flex gap-2 border-b border-gray-200">
+    <div className="min-h-screen bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950 text-white p-8 space-y-6">
+      <div className="flex flex-wrap items-center justify-between gap-4">
+        <div>
+          <p className="text-xs uppercase tracking-[0.4em] text-white/60">Control Center</p>
+          <h1 className="text-3xl font-semibold mt-2">Profile & Company Settings</h1>
+          <p className="text-white/60 mt-1">Keep your identity and firm metadata in sync with Endless Copilot.</p>
+        </div>
         <button
-          onClick={() => setActiveTab('personal')}
-          className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
-            activeTab === 'personal'
-              ? 'border-blue-600 text-blue-600'
-              : 'border-transparent text-gray-600 hover:text-gray-900'
-          }`}
+          onClick={handleLogout}
+          className="inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/5 px-4 py-2 text-sm text-white/80 transition hover:text-white"
         >
-          <User className="w-4 h-4 inline mr-2" />
-          Personal Info
-        </button>
-        <button
-          onClick={() => setActiveTab('company')}
-          className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
-            activeTab === 'company'
-              ? 'border-blue-600 text-blue-600'
-              : 'border-transparent text-gray-600 hover:text-gray-900'
-          }`}
-        >
-          <Building2 className="w-4 h-4 inline mr-2" />
-          Company Settings
+          <LogOut className="w-4 h-4" />
+          Log out
         </button>
       </div>
 
-      {/* Personal Info Tab */}
-      {activeTab === 'personal' && (
-        <div className="bg-white rounded-2xl border border-gray-200 p-8 space-y-6">
-          {/* Avatar Section */}
-          <div className="flex items-center gap-6 pb-6 border-b border-gray-200">
-            <div className="w-24 h-24 bg-gradient-to-r from-blue-600 to-purple-600 rounded-full flex items-center justify-center text-white text-3xl font-bold">
-              JD
+      <div className="grid lg:grid-cols-2 gap-4">
+        <div className="rounded-3xl border border-white/10 bg-white/5 backdrop-blur-xl p-6 space-y-4">
+          <div className="flex items-center gap-4">
+            <div className="h-16 w-16 rounded-2xl bg-gradient-to-r from-fuchsia-500 to-indigo-500 flex items-center justify-center text-xl font-semibold">
+              {initials}
             </div>
             <div>
-              <h3 className="font-semibold text-gray-900 mb-1">Profile Photo</h3>
-              <p className="text-sm text-gray-600 mb-3">Update your profile picture</p>
-              <button className="btn btn-secondary text-sm flex items-center gap-2">
-                <Upload className="w-4 h-4" />
-                Upload Photo
-              </button>
+              <p className="text-sm text-white/60 uppercase tracking-[0.3em]">Identity</p>
+              <h3 className="text-2xl font-semibold">{personalInfo.fullName || 'Demo User'}</h3>
+              <p className="text-white/60 text-sm">{personalInfo.email || 'demo@endless.finance'}</p>
             </div>
           </div>
+          <div className="grid grid-cols-2 gap-3 text-sm text-white/70">
+            <div className="rounded-2xl border border-white/10 bg-white/5 p-3 flex items-center gap-2">
+              <Mail className="w-4 h-4 text-fuchsia-300" />
+              {personalInfo.role || 'Admin'}
+            </div>
+            <div className="rounded-2xl border border-white/10 bg-white/5 p-3 flex items-center gap-2">
+              <Calendar className="w-4 h-4 text-cyan-300" />
+              Joined Endless
+            </div>
+          </div>
+        </div>
 
-          {/* Form Fields */}
-          <div className="grid grid-cols-2 gap-6">
+        <div className="rounded-3xl border border-white/10 bg-white/5 backdrop-blur-xl p-6 space-y-4">
+          <div className="flex items-center gap-4">
+            <div className="h-16 w-16 rounded-2xl border border-white/20 bg-white/5 flex items-center justify-center">
+              <Building2 className="w-6 h-6 text-fuchsia-200" />
+            </div>
             <div>
-              <label className="label">Full Name</label>
+              <p className="text-sm text-white/60 uppercase tracking-[0.3em]">Company</p>
+              <h3 className="text-2xl font-semibold">{companyInfo.name || 'Demo Company'}</h3>
+              <p className="text-white/60 text-sm">{companyInfo.industry || 'Technology'}</p>
+            </div>
+          </div>
+          <div className="grid grid-cols-2 gap-3 text-sm text-white/70">
+            <div className="rounded-2xl border border-white/10 bg-white/5 p-3 flex items-center gap-2">
+              <Phone className="w-4 h-4 text-emerald-300" />
+              {companyInfo.phone || '—'}
+            </div>
+            <div className="rounded-2xl border border-white/10 bg-white/5 p-3 flex items-center gap-2">
+              <MapPin className="w-4 h-4 text-sky-300" />
+              {companyInfo.city ? `${companyInfo.city}, ${companyInfo.state}` : 'Unknown HQ'}
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div className="flex gap-3 border-b border-white/10 pb-1">
+        {[
+          { key: 'personal', label: 'Personal Identity', icon: User },
+          { key: 'company', label: 'Company Metadata', icon: Building2 }
+        ].map(tab => (
+          <button
+            key={tab.key}
+            onClick={() => setActiveTab(tab.key as 'personal' | 'company')}
+            className={`flex items-center gap-2 rounded-full px-4 py-2 text-sm font-semibold transition ${
+              activeTab === tab.key
+                ? 'bg-gradient-to-r from-fuchsia-500/50 to-cyan-500/50 text-white shadow-[0_10px_40px_rgba(147,51,234,0.35)]'
+                : 'text-white/60 hover:text-white'
+            }`}
+          >
+            <tab.icon className="w-4 h-4" />
+            {tab.label}
+          </button>
+        ))}
+      </div>
+
+      {activeTab === 'personal' && (
+        <div className="rounded-3xl border border-white/10 bg-white/5 backdrop-blur-xl p-6 space-y-8">
+          <div className="flex flex-wrap items-center justify-between gap-4 border-b border-white/10 pb-6">
+            <div>
+              <p className="text-xs uppercase tracking-[0.4em] text-white/50">Profile photo</p>
+              <h3 className="text-lg font-semibold text-white mt-1">Update your avatar</h3>
+            </div>
+            <button className="inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/5 px-4 py-2 text-sm text-white/80">
+              <Upload className="w-4 h-4" />
+              Upload photo
+            </button>
+          </div>
+
+          <div className="grid md:grid-cols-2 gap-6">
+            <div>
+              <p className={labelStyles}>Full name</p>
               <input
                 type="text"
                 value={personalInfo.fullName}
                 onChange={(e) => setPersonalInfo({ ...personalInfo, fullName: e.target.value })}
-                className="input"
+                className={inputStyles}
               />
             </div>
-
             <div>
-              <label className="label">Email</label>
+              <p className={labelStyles}>Email</p>
               <input
                 type="email"
                 value={personalInfo.email}
                 onChange={(e) => setPersonalInfo({ ...personalInfo, email: e.target.value })}
-                className="input"
+                className={inputStyles}
               />
             </div>
-
             <div>
-              <label className="label">Phone</label>
+              <p className={labelStyles}>Phone</p>
               <input
                 type="tel"
                 value={personalInfo.phone}
                 onChange={(e) => setPersonalInfo({ ...personalInfo, phone: e.target.value })}
-                className="input"
+                className={inputStyles}
+                placeholder="+1 555 0100"
               />
             </div>
-
             <div>
-              <label className="label">Role</label>
+              <p className={labelStyles}>Role</p>
               <select
                 value={personalInfo.role}
                 onChange={(e) => setPersonalInfo({ ...personalInfo, role: e.target.value })}
-                className="input"
+                className={`${inputStyles} bg-slate-950/40`}
               >
                 <option value="Admin">Admin</option>
                 <option value="Accountant">Accountant</option>
@@ -219,53 +275,51 @@ export default function Profile() {
             </div>
           </div>
 
-          {/* Actions */}
-          <div className="flex justify-end gap-3 pt-6 border-t border-gray-200">
-            <button className="btn btn-secondary">Cancel</button>
-            <button onClick={handlePersonalSave} className="btn btn-primary flex items-center gap-2">
+          <div className="flex flex-wrap justify-end gap-3 border-t border-white/10 pt-6">
+            <button className="rounded-full border border-white/15 px-5 py-2 text-sm text-white/70 hover:text-white">
+              Cancel
+            </button>
+            <button
+              onClick={handlePersonalSave}
+              disabled={loading}
+              className="inline-flex items-center gap-2 rounded-full bg-gradient-to-r from-fuchsia-500 to-indigo-500 px-5 py-2 text-sm font-semibold shadow-[0_15px_45px_rgba(129,80,255,0.45)] disabled:opacity-40"
+            >
               <Save className="w-4 h-4" />
-              Save Changes
+              Save changes
             </button>
           </div>
         </div>
       )}
 
-      {/* Company Settings Tab */}
       {activeTab === 'company' && (
-        <div className="bg-white rounded-2xl border border-gray-200 p-8 space-y-6">
-          {/* Company Logo */}
-          <div className="flex items-center gap-6 pb-6 border-b border-gray-200">
-            <div className="w-24 h-24 bg-gray-100 rounded-xl flex items-center justify-center">
-              <Building2 className="w-12 h-12 text-gray-400" />
-            </div>
+        <div className="rounded-3xl border border-white/10 bg-white/5 backdrop-blur-xl p-6 space-y-8">
+          <div className="flex flex-wrap items-center justify-between gap-4 border-b border-white/10 pb-6">
             <div>
-              <h3 className="font-semibold text-gray-900 mb-1">Company Logo</h3>
-              <p className="text-sm text-gray-600 mb-3">Upload your company logo</p>
-              <button className="btn btn-secondary text-sm flex items-center gap-2">
-                <Upload className="w-4 h-4" />
-                Upload Logo
-              </button>
+              <p className="text-xs uppercase tracking-[0.4em] text-white/50">Logo</p>
+              <h3 className="text-lg font-semibold text-white mt-1">Refresh brand identity</h3>
             </div>
+            <button className="inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/5 px-4 py-2 text-sm text-white/80">
+              <Upload className="w-4 h-4" />
+              Upload logo
+            </button>
           </div>
 
-          {/* Form Fields */}
-          <div className="grid grid-cols-2 gap-6">
-            <div className="col-span-2">
-              <label className="label">Company Name</label>
+          <div className="grid md:grid-cols-2 gap-6">
+            <div className="md:col-span-2">
+              <p className={labelStyles}>Company name</p>
               <input
                 type="text"
                 value={companyInfo.name}
                 onChange={(e) => setCompanyInfo({ ...companyInfo, name: e.target.value })}
-                className="input"
+                className={inputStyles}
               />
             </div>
-
             <div>
-              <label className="label">Industry</label>
+              <p className={labelStyles}>Industry</p>
               <select
                 value={companyInfo.industry}
                 onChange={(e) => setCompanyInfo({ ...companyInfo, industry: e.target.value })}
-                className="input"
+                className={`${inputStyles} bg-slate-950/40`}
               >
                 <option value="Technology">Technology</option>
                 <option value="Retail">Retail</option>
@@ -276,122 +330,120 @@ export default function Profile() {
                 <option value="Other">Other</option>
               </select>
             </div>
-
             <div>
-              <label className="label">Tax ID (EIN)</label>
+              <p className={labelStyles}>Tax ID (EIN)</p>
               <input
                 type="text"
                 value={companyInfo.taxId}
                 onChange={(e) => setCompanyInfo({ ...companyInfo, taxId: e.target.value })}
-                className="input"
+                className={inputStyles}
               />
             </div>
-
             <div>
-              <label className="label">Email</label>
+              <p className={labelStyles}>Email</p>
               <input
                 type="email"
                 value={companyInfo.email}
                 onChange={(e) => setCompanyInfo({ ...companyInfo, email: e.target.value })}
-                className="input"
+                className={inputStyles}
               />
             </div>
-
             <div>
-              <label className="label">Phone</label>
+              <p className={labelStyles}>Phone</p>
               <input
                 type="tel"
                 value={companyInfo.phone}
                 onChange={(e) => setCompanyInfo({ ...companyInfo, phone: e.target.value })}
-                className="input"
+                className={inputStyles}
               />
             </div>
-
-            <div className="col-span-2">
-              <label className="label">Address</label>
+            <div className="md:col-span-2">
+              <p className={labelStyles}>Address</p>
               <input
                 type="text"
                 value={companyInfo.address}
                 onChange={(e) => setCompanyInfo({ ...companyInfo, address: e.target.value })}
-                className="input"
+                className={inputStyles}
               />
             </div>
-
             <div>
-              <label className="label">City</label>
+              <p className={labelStyles}>City</p>
               <input
                 type="text"
                 value={companyInfo.city}
                 onChange={(e) => setCompanyInfo({ ...companyInfo, city: e.target.value })}
-                className="input"
+                className={inputStyles}
               />
             </div>
-
             <div>
-              <label className="label">State</label>
+              <p className={labelStyles}>State</p>
               <input
                 type="text"
                 value={companyInfo.state}
                 onChange={(e) => setCompanyInfo({ ...companyInfo, state: e.target.value })}
-                className="input"
+                className={inputStyles}
               />
             </div>
-
             <div>
-              <label className="label">ZIP Code</label>
+              <p className={labelStyles}>ZIP code</p>
               <input
                 type="text"
                 value={companyInfo.zipCode}
                 onChange={(e) => setCompanyInfo({ ...companyInfo, zipCode: e.target.value })}
-                className="input"
+                className={inputStyles}
               />
             </div>
-
             <div>
-              <label className="label">Country</label>
+              <p className={labelStyles}>Country</p>
               <input
                 type="text"
                 value={companyInfo.country}
                 onChange={(e) => setCompanyInfo({ ...companyInfo, country: e.target.value })}
-                className="input"
+                className={inputStyles}
               />
             </div>
-
             <div>
-              <label className="label">Fiscal Year End</label>
+              <p className={labelStyles}>Fiscal year end</p>
               <input
                 type="text"
                 value={companyInfo.fiscalYearEnd}
                 onChange={(e) => setCompanyInfo({ ...companyInfo, fiscalYearEnd: e.target.value })}
                 placeholder="MM-DD"
-                className="input"
+                className={inputStyles}
               />
             </div>
           </div>
 
-          {/* Actions */}
-          <div className="flex justify-end gap-3 pt-6 border-t border-gray-200">
-            <button className="btn btn-secondary">Cancel</button>
-            <button onClick={handleCompanySave} className="btn btn-primary flex items-center gap-2">
+          <div className="flex flex-wrap justify-end gap-3 border-t border-white/10 pt-6">
+            <button className="rounded-full border border-white/15 px-5 py-2 text-sm text-white/70 hover:text-white">
+              Cancel
+            </button>
+            <button
+              onClick={handleCompanySave}
+              disabled={loading}
+              className="inline-flex items-center gap-2 rounded-full bg-gradient-to-r from-fuchsia-500 to-indigo-500 px-5 py-2 text-sm font-semibold shadow-[0_15px_45px_rgba(129,80,255,0.45)] disabled:opacity-40"
+            >
               <Save className="w-4 h-4" />
-              Save Changes
+              Save changes
             </button>
           </div>
         </div>
       )}
 
-      {/* Danger Zone */}
-      <div className="bg-white rounded-2xl border border-red-200 p-8 space-y-4">
-        <h3 className="text-lg font-semibold text-red-900">Danger Zone</h3>
-        <div className="flex items-center justify-between p-4 bg-red-50 rounded-lg">
+      <div className="rounded-3xl border border-rose-500/30 bg-rose-500/10 p-6 space-y-4">
+        <div className="flex items-center gap-3">
+          <AlertCircle className="w-5 h-5 text-rose-300" />
           <div>
-            <p className="font-medium text-red-900">Delete Account</p>
-            <p className="text-sm text-red-700">Permanently delete your account and all data</p>
+            <p className="text-sm uppercase tracking-[0.4em] text-rose-300">Danger zone</p>
+            <h3 className="text-lg font-semibold text-white mt-1">Delete account</h3>
           </div>
-          <button className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors text-sm font-medium">
-            Delete Account
-          </button>
         </div>
+        <p className="text-sm text-white/70">
+          Permanently remove this user and company data from Endless Copilot. This cannot be undone once confirmed.
+        </p>
+        <button className="rounded-full bg-gradient-to-r from-rose-500 to-red-500 px-5 py-2 text-sm font-semibold shadow-[0_15px_45px_rgba(225,29,72,0.4)]">
+          Delete account
+        </button>
       </div>
     </div>
   )

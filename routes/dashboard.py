@@ -27,8 +27,8 @@ def get_dashboard_stats(company_id: str):
     }
 
     for account in accounts:
-        acc_type = account.get("type", "")
-        balance = account.get("balance", 0) or 0
+        acc_type = account.get("account_type", "")
+        balance = account.get("current_balance", 0) or 0
         if acc_type in totals:
             totals[acc_type] += balance
 
@@ -43,19 +43,9 @@ def get_dashboard_stats(company_id: str):
 
     transaction_count = journal_entries_response.count or 0
 
-    # Get top vendor (most frequent in expenses)
-    expenses_response = supabase.table("expenses")\
-        .select("vendor_name")\
-        .eq("company_id", company_id)\
-        .execute()
-
-    vendor_counts = defaultdict(int)
-    for expense in (expenses_response.data or []):
-        vendor_name = expense.get("vendor_name", "Unknown")
-        if vendor_name:
-            vendor_counts[vendor_name] += 1
-
-    top_vendor = max(vendor_counts.items(), key=lambda x: x[1])[0] if vendor_counts else "N/A"
+    # For now, we don't have a top vendor concept since we use journal entries
+    # Could be enhanced later by tracking contacts/vendors in journal lines
+    top_vendor = "N/A"
 
     # Calculate health score (simple metric based on assets vs liabilities ratio)
     if totals["liability"] > 0:
@@ -83,7 +73,7 @@ def get_monthly_trend(company_id: str, months: int = 6):
     start_date = (datetime.now() - timedelta(days=months * 30)).strftime("%Y-%m-%d")
 
     journal_entries_response = supabase.table("journal_entries")\
-        .select("id, entry_date, journal_lines(debit, credit, accounts(type))")\
+        .select("id, entry_date, journal_lines(debit, credit, accounts(account_type))")\
         .eq("company_id", company_id)\
         .gte("entry_date", start_date)\
         .execute()
@@ -96,7 +86,7 @@ def get_monthly_trend(company_id: str, months: int = 6):
         month_key = entry_date.strftime("%b")
 
         for line in entry.get("journal_lines", []):
-            account_type = line.get("accounts", {}).get("type", "")
+            account_type = line.get("accounts", {}).get("account_type", "")
             credit = line.get("credit", 0) or 0
             debit = line.get("debit", 0) or 0
 
@@ -127,21 +117,21 @@ def get_category_breakdown(company_id: str):
 
     # Get all expense accounts with balances
     accounts_response = supabase.table("accounts")\
-        .select("account_name, balance")\
+        .select("account_name, current_balance")\
         .eq("company_id", company_id)\
-        .eq("type", "expense")\
-        .gt("balance", 0)\
+        .eq("account_type", "expense")\
+        .gt("current_balance", 0)\
         .execute()
 
     accounts = accounts_response.data or []
 
     # Calculate total expenses
-    total_expenses = sum(acc.get("balance", 0) or 0 for acc in accounts)
+    total_expenses = sum(acc.get("current_balance", 0) or 0 for acc in accounts)
 
     # Calculate percentage for each
     breakdown = []
     for account in accounts[:5]:  # Top 5
-        balance = account.get("balance", 0) or 0
+        balance = account.get("current_balance", 0) or 0
         percentage = (balance / total_expenses * 100) if total_expenses > 0 else 0
         breakdown.append({
             "name": account.get("account_name", "Unknown"),
@@ -150,7 +140,7 @@ def get_category_breakdown(company_id: str):
 
     # Add "Other" if there are more than 5 accounts
     if len(accounts) > 5:
-        other_total = sum(acc.get("balance", 0) or 0 for acc in accounts[5:])
+        other_total = sum(acc.get("current_balance", 0) or 0 for acc in accounts[5:])
         other_percentage = (other_total / total_expenses * 100) if total_expenses > 0 else 0
         breakdown.append({
             "name": "Other",

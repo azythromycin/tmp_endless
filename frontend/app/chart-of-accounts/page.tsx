@@ -2,7 +2,6 @@
 
 import { useState, useEffect } from 'react'
 import {
-  Plus,
   Upload,
   Download,
   ChevronRight,
@@ -12,9 +11,8 @@ import {
   Loader2,
   FolderTree
 } from 'lucide-react'
-import { useAuth } from '@/contexts/AuthContext'
 import { api } from '@/lib/api'
-import { useRouter } from 'next/navigation'
+import { useAuth } from '@/contexts/AuthContext'
 
 interface Account {
   id: string
@@ -29,23 +27,19 @@ interface Account {
 }
 
 export default function ChartOfAccounts() {
-  const { user, company, loading: authLoading } = useAuth()
-  const router = useRouter()
+  const { company } = useAuth()
+  const companyId = company?.id || null
   const [accounts, setAccounts] = useState<Account[]>([])
   const [loading, setLoading] = useState(true)
   const [uploadingCSV, setUploadingCSV] = useState(false)
   const [filter, setFilter] = useState<string>('all')
+  const [totalsByType, setTotalsByType] = useState<Record<string, number>>({})
 
   useEffect(() => {
-    if (!authLoading && !user) {
-      router.push('/login')
-      return
+    if (companyId) {
+      fetchAccounts(companyId)
     }
-
-    if (user && company) {
-      fetchAccounts()
-    }
-  }, [user, company, authLoading, router])
+  }, [companyId])
 
   const buildAccountHierarchy = (flatAccounts: Account[]): Account[] => {
     const accountMap = new Map<string, Account>()
@@ -75,24 +69,28 @@ export default function ChartOfAccounts() {
     return rootAccounts
   }
 
-  const fetchAccounts = async () => {
-    if (!company) return
-
+  const fetchAccounts = async (targetCompanyId: string) => {
     try {
       setLoading(true)
-      const response = await api.get(`/accounts/company/${company.id}`)
+      const response = await api.get(`/accounts/company/${targetCompanyId}`)
 
       // Map API response to our Account interface
       const accountsData: Account[] = response.map((acc: any) => ({
         id: acc.id,
         code: acc.account_code,
         name: acc.account_name,
-        type: acc.type,
-        subtype: acc.subtype || '',
-        balance: acc.balance || 0,
+        type: acc.account_type,
+        subtype: acc.account_subtype || '',
+        balance: acc.current_balance || 0,
         parentId: acc.parent_account_id,
         isExpanded: false
       }))
+
+      const typeTotals = accountsData.reduce((acc: Record<string, number>, account) => {
+        acc[account.type] = (acc[account.type] || 0) + (account.balance || 0)
+        return acc
+      }, {})
+      setTotalsByType(typeTotals)
 
       // Build hierarchy
       const accountsWithChildren = buildAccountHierarchy(accountsData)
@@ -106,7 +104,7 @@ export default function ChartOfAccounts() {
 
   const handleCSVUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
-    if (!file) return
+    if (!file || !companyId) return
 
     setUploadingCSV(true)
     const formData = new FormData()
@@ -116,7 +114,7 @@ export default function ChartOfAccounts() {
       // Replace with actual API call
       await new Promise(resolve => setTimeout(resolve, 2000))
       alert('Chart of Accounts uploaded successfully!')
-      fetchAccounts()
+      fetchAccounts(companyId)
     } catch (error) {
       console.error('Failed to upload CSV:', error)
       alert('Failed to upload CSV. Please try again.')
@@ -162,35 +160,33 @@ export default function ChartOfAccounts() {
     )
   }
 
-  const getTypeColor = (type: string) => {
-    const colors = {
-      asset: 'text-green-700 bg-green-50',
-      liability: 'text-red-700 bg-red-50',
-      equity: 'text-blue-700 bg-blue-50',
-      revenue: 'text-purple-700 bg-purple-50',
-      expense: 'text-orange-700 bg-orange-50',
-    }
-    return colors[type as keyof typeof colors] || 'text-gray-700 bg-gray-50'
-  }
-
   const filteredAccounts = filter === 'all'
     ? accounts
     : accounts.filter(a => a.type === filter)
 
+  if (!companyId) {
+    return (
+      <div className="flex items-center justify-center h-screen bg-slate-950">
+        <Loader2 className="w-8 h-8 text-fuchsia-300 animate-spin" />
+      </div>
+    )
+  }
+
   return (
-    <div className="p-8 space-y-6">
+    <div className="min-h-screen p-8 space-y-6 bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950 text-slate-100">
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-wrap items-center justify-between gap-4">
         <div>
-          <h1 className="text-3xl font-bold text-gray-900">Chart of Accounts</h1>
-          <p className="text-gray-600 mt-1">Manage your account structure and balances</p>
+          <p className="text-xs uppercase tracking-[0.3em] text-white/60">Ledger structure</p>
+          <h1 className="text-3xl font-semibold text-white mt-2">Chart of Accounts</h1>
+          <p className="text-white/60 mt-1">Balances stay synced with every journal entry.</p>
         </div>
-        <div className="flex gap-3">
-          <button onClick={exportToCSV} className="btn btn-secondary flex items-center gap-2">
+        <div className="flex gap-3 flex-wrap">
+          <button onClick={exportToCSV} className="px-4 py-2 rounded-full border border-white/15 bg-white/5 text-sm font-medium flex items-center gap-2">
             <Download className="w-4 h-4" />
             Export CSV
           </button>
-          <label className="btn btn-secondary cursor-pointer flex items-center gap-2">
+          <label className="px-4 py-2 rounded-full border border-white/15 bg-white/5 text-sm font-medium flex items-center gap-2 cursor-pointer">
             <Upload className="w-4 h-4" />
             {uploadingCSV ? 'Uploading...' : 'Upload CSV'}
             <input
@@ -201,23 +197,31 @@ export default function ChartOfAccounts() {
               disabled={uploadingCSV}
             />
           </label>
-          <button className="btn btn-primary flex items-center gap-2">
-            <Plus className="w-4 h-4" />
-            New Account
-          </button>
         </div>
       </div>
 
+      <div className="grid md:grid-cols-3 xl:grid-cols-5 gap-4">
+        {['asset', 'liability', 'equity', 'revenue', 'expense'].map(type => (
+          <div key={type} className="rounded-3xl border border-white/10 bg-white/5 backdrop-blur-xl p-4">
+            <p className="text-xs uppercase tracking-widest text-white/50">{type}</p>
+            <p className="text-2xl font-semibold text-white mt-2">
+              ${(totalsByType[type] || 0).toLocaleString()}
+            </p>
+            <p className="text-white/40 text-xs mt-1">Current balance</p>
+          </div>
+        ))}
+      </div>
+
       {/* Filter Tabs */}
-      <div className="flex gap-2 border-b border-gray-200">
+      <div className="flex gap-2 border-b border-white/10 overflow-x-auto">
         {['all', 'asset', 'liability', 'equity', 'revenue', 'expense'].map(type => (
           <button
             key={type}
             onClick={() => setFilter(type)}
-            className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
+            className={`px-4 py-2 text-sm font-semibold border-b-2 transition-colors ${
               filter === type
-                ? 'border-blue-600 text-blue-600'
-                : 'border-transparent text-gray-600 hover:text-gray-900'
+                ? 'border-fuchsia-400 text-white'
+                : 'border-transparent text-white/50 hover:text-white'
             }`}
           >
             {type.charAt(0).toUpperCase() + type.slice(1)}
@@ -228,12 +232,12 @@ export default function ChartOfAccounts() {
       {/* Accounts Tree */}
       {loading ? (
         <div className="text-center py-12">
-          <Loader2 className="w-8 h-8 text-gray-400 animate-spin mx-auto" />
+          <Loader2 className="w-8 h-8 text-white/60 animate-spin mx-auto" />
         </div>
       ) : (
-        <div className="bg-white rounded-2xl border border-gray-200 overflow-hidden">
+        <div className="rounded-3xl border border-white/10 bg-white/5 backdrop-blur-xl overflow-hidden">
           {/* Table Header */}
-          <div className="grid grid-cols-12 gap-4 px-6 py-4 bg-gray-50 border-b border-gray-200 text-sm font-medium text-gray-700">
+          <div className="grid grid-cols-12 gap-4 px-6 py-4 border-b border-white/10 text-xs font-semibold text-white/60 uppercase tracking-wide">
             <div className="col-span-1">Code</div>
             <div className="col-span-4">Account Name</div>
             <div className="col-span-2">Type</div>
@@ -244,17 +248,17 @@ export default function ChartOfAccounts() {
 
           {/* Accounts */}
           {filteredAccounts.length > 0 ? (
-            <div className="divide-y divide-gray-100">
+            <div className="divide-y divide-white/10">
               {filteredAccounts.map(account => (
                 <div key={account.id}>
                   {/* Parent Account */}
-                  <div className="grid grid-cols-12 gap-4 px-6 py-4 hover:bg-gray-50 transition-colors">
-                    <div className="col-span-1 font-mono text-sm text-gray-900">{account.code}</div>
+                  <div className="grid grid-cols-12 gap-4 px-6 py-4 hover:bg-white/5 transition-colors">
+                    <div className="col-span-1 font-mono text-sm text-white">{account.code}</div>
                     <div className="col-span-4 flex items-center gap-2">
                       {account.children && account.children.length > 0 && (
                         <button
                           onClick={() => toggleExpand(account.id)}
-                          className="text-gray-400 hover:text-gray-600"
+                          className="text-white/50 hover:text-white transition-colors"
                         >
                           {account.isExpanded ? (
                             <ChevronDown className="w-4 h-4" />
@@ -263,24 +267,26 @@ export default function ChartOfAccounts() {
                           )}
                         </button>
                       )}
-                      <span className="font-medium text-gray-900">{account.name}</span>
+                      <span className="font-medium text-white">{account.name}</span>
                     </div>
                     <div className="col-span-2">
-                      <span className={`inline-flex px-2 py-1 rounded-lg text-xs font-medium ${getTypeColor(account.type)}`}>
+                      <span className="inline-flex px-2 py-1 rounded-lg text-xs font-medium bg-white/10 border border-white/15 text-white">
                         {account.type.charAt(0).toUpperCase() + account.type.slice(1)}
                       </span>
                     </div>
-                    <div className="col-span-2 text-sm text-gray-600">
-                      {account.subtype.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}
+                    <div className="col-span-2 text-sm text-white/70">
+                      {account.subtype
+                        ? account.subtype.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())
+                        : '—'}
                     </div>
-                    <div className="col-span-2 text-right font-medium text-gray-900">
+                    <div className="col-span-2 text-right font-medium text-white">
                       ${account.balance.toLocaleString()}
                     </div>
                     <div className="col-span-1 flex justify-end gap-2">
-                      <button className="text-gray-400 hover:text-blue-600">
+                      <button className="text-white/50 hover:text-white">
                         <Edit className="w-4 h-4" />
                       </button>
-                      <button className="text-gray-400 hover:text-red-600">
+                      <button className="text-white/50 hover:text-rose-300">
                         <Trash2 className="w-4 h-4" />
                       </button>
                     </div>
@@ -290,26 +296,28 @@ export default function ChartOfAccounts() {
                   {account.isExpanded && account.children?.map(child => (
                     <div
                       key={child.id}
-                      className="grid grid-cols-12 gap-4 px-6 py-3 bg-gray-50 hover:bg-gray-100 transition-colors"
+                      className="grid grid-cols-12 gap-4 px-6 py-3 bg-white/5 hover:bg-white/10 transition-colors"
                     >
-                      <div className="col-span-1 font-mono text-sm text-gray-700 pl-8">{child.code}</div>
-                      <div className="col-span-4 pl-8 text-sm text-gray-900">{child.name}</div>
+                      <div className="col-span-1 font-mono text-sm text-white/70 pl-8">{child.code}</div>
+                      <div className="col-span-4 pl-8 text-sm text-white/85">{child.name}</div>
                       <div className="col-span-2">
-                        <span className={`inline-flex px-2 py-1 rounded-lg text-xs font-medium ${getTypeColor(child.type)}`}>
+                        <span className="inline-flex px-2 py-1 rounded-lg text-xs font-medium bg-white/10 border border-white/15 text-white">
                           {child.type.charAt(0).toUpperCase() + child.type.slice(1)}
                         </span>
                       </div>
-                      <div className="col-span-2 text-sm text-gray-600">
-                        {child.subtype.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}
+                      <div className="col-span-2 text-sm text-white/60">
+                        {child.subtype
+                          ? child.subtype.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())
+                          : '—'}
                       </div>
-                      <div className="col-span-2 text-right text-sm font-medium text-gray-900">
+                      <div className="col-span-2 text-right text-sm font-medium text-white/80">
                         ${child.balance.toLocaleString()}
                       </div>
                       <div className="col-span-1 flex justify-end gap-2">
-                        <button className="text-gray-400 hover:text-blue-600">
+                        <button className="text-white/40 hover:text-white">
                           <Edit className="w-4 h-4" />
                         </button>
-                        <button className="text-gray-400 hover:text-red-600">
+                        <button className="text-white/40 hover:text-rose-300">
                           <Trash2 className="w-4 h-4" />
                         </button>
                       </div>
@@ -319,8 +327,8 @@ export default function ChartOfAccounts() {
               ))}
             </div>
           ) : (
-            <div className="text-center py-12 text-gray-500">
-              <FolderTree className="w-12 h-12 mx-auto mb-3 text-gray-400" />
+            <div className="text-center py-12 text-white/60">
+              <FolderTree className="w-12 h-12 mx-auto mb-3 text-white/30" />
               <p>No accounts found</p>
               <p className="text-sm mt-1">Upload a CSV or create your first account</p>
             </div>
@@ -329,17 +337,21 @@ export default function ChartOfAccounts() {
       )}
 
       {/* CSV Upload Instructions */}
-      <div className="bg-blue-50 border border-blue-200 rounded-xl p-6">
-        <h3 className="font-semibold text-blue-900 mb-2">CSV Upload Format</h3>
-        <p className="text-sm text-blue-700 mb-3">
-          Your CSV file should have the following columns:
-        </p>
-        <code className="block bg-white px-4 py-2 rounded-lg text-sm text-gray-800 border border-blue-200">
-          Account Code, Account Name, Type, Subtype, Opening Balance
-        </code>
-        <p className="text-xs text-blue-600 mt-2">
-          Types: asset, liability, equity, revenue, expense
-        </p>
+      <div className="relative overflow-hidden rounded-3xl border border-white/10 bg-gradient-to-r from-slate-900/80 to-slate-900/40 p-6">
+        <div className="absolute inset-y-0 right-0 w-1/3 bg-gradient-to-l from-fuchsia-500/10 to-transparent pointer-events-none" />
+        <div className="relative space-y-3">
+          <p className="text-xs uppercase tracking-[0.35em] text-white/60">CSV format</p>
+          <h3 className="text-2xl font-semibold text-white">Import your ledger structure</h3>
+          <p className="text-sm text-white/70">
+            Keep columns in this order so every account lands in the right place.
+          </p>
+          <code className="block w-full rounded-2xl border border-white/15 bg-white/5 px-4 py-3 font-mono text-sm text-white">
+            Account Code, Account Name, Type, Subtype, Opening Balance
+          </code>
+          <p className="text-xs text-white/50">
+            Supported types: asset, liability, equity, revenue, expense
+          </p>
+        </div>
       </div>
     </div>
   )

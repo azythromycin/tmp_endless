@@ -1,159 +1,221 @@
 "use client";
 
 import { useState } from "react";
-import { api, COMPANY_ID } from "@/lib/api";
+import { api } from "@/lib/api";
+import { useAuth } from "@/contexts/AuthContext";
+import { Loader2, Sparkles, LineChart, Target, Building } from "lucide-react";
+
+interface Message {
+  role: 'user' | 'assistant';
+  content: string;
+  metadata?: { account_count?: number; journal_count?: number };
+}
+
+const sanitize = (text: string) =>
+  text
+    .replace(/\*\*(.*?)\*\*/g, '$1')
+    .replace(/\*/g, '')
+    .trim();
+
+const quickPrompts = [
+  "Give me a cash flow outlook for next month",
+  "Break down my top three expense categories",
+  "How balanced are my debits vs credits right now?"
+];
 
 export default function AIConsolePage() {
+  const { company } = useAuth();
+  const companyId = company?.id || null;
   const [query, setQuery] = useState("");
-  const [answer, setAnswer] = useState("");
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState("");
-  const [metadata, setMetadata] = useState<{ expense_count?: number; total_amount?: number } | null>(null);
+  const [messages, setMessages] = useState<Message[]>([]);
+  const [insightMeta, setInsightMeta] = useState<{ accounts?: number; journals?: number }>({});
 
   const handleAsk = async () => {
-    if (!query.trim()) return;
+    if (!query.trim() || !companyId) return;
 
+    const userMessage: Message = { role: 'user', content: query };
+    setMessages(prev => [...prev, userMessage]);
+    setQuery("");
     setLoading(true);
-    setError("");
-    setAnswer("");
-    setMetadata(null);
 
     try {
-      const resp = await api.post<{ answer: string; expense_count: number; total_amount?: number }>(
+      const resp = await api.post<{ answer: string; account_count: number; journal_count: number }>(
         "/ai/query",
         {
-          company_id: COMPANY_ID,
-          question: query,
+          company_id: companyId,
+          question: userMessage.content,
         }
       );
 
-      setAnswer(resp.answer);
-      setMetadata({
-        expense_count: resp.expense_count,
-        total_amount: resp.total_amount,
-      });
+      const assistantMessage: Message = {
+        role: 'assistant',
+        content: sanitize(resp.answer),
+        metadata: {
+          account_count: resp.account_count,
+          journal_count: resp.journal_count,
+        }
+      };
+      setInsightMeta({ accounts: resp.account_count, journals: resp.journal_count });
+      setMessages(prev => [...prev, assistantMessage]);
     } catch (err: any) {
-      const errorMsg = err.response?.data?.detail || err.message;
-      if (errorMsg.includes("OPENAI_API_KEY")) {
-        setError("AI assistant requires OpenAI API key. Please configure OPENAI_API_KEY in your backend .env file.");
-      } else {
-        setError(`Error: ${errorMsg}`);
+      let errorMsg = 'Unknown error';
+      if (err.response?.data?.detail) {
+        errorMsg = typeof err.response.data.detail === 'string'
+          ? err.response.data.detail
+          : JSON.stringify(err.response.data.detail);
+      } else if (err.message) {
+        errorMsg = err.message;
       }
+
+      const errorMessage: Message = {
+        role: 'assistant',
+        content: sanitize(
+          errorMsg.includes("OPENAI_API_KEY")
+            ? "AI assistant requires an OpenAI API key on the backend."
+            : `Sorry, I encountered an error: ${errorMsg}`
+        )
+      };
+      setMessages(prev => [...prev, errorMessage]);
     } finally {
       setLoading(false);
     }
   };
 
+  const companyBlocked = !companyId;
+
   return (
-    <div className="space-y-6">
-      <div>
-        <h1 className="text-3xl font-bold text-gray-900">AI Console</h1>
-        <p className="text-gray-600 mt-1">Ask questions about your financial data</p>
-      </div>
-
-      <div className="card">
-        <h2 className="text-lg font-semibold mb-4">Ask a Question</h2>
-
-        <div className="space-y-4">
+    <div className="min-h-screen bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950 text-slate-100 p-8 space-y-6">
+      <div className="flex flex-col gap-4 rounded-3xl border border-white/10 bg-white/5 backdrop-blur-xl p-6">
+        <div className="flex flex-wrap items-center justify-between gap-4">
           <div>
-            <label className="label">Your Question</label>
-            <textarea
-              className="input resize-none"
-              rows={3}
-              value={query}
-              onChange={(e) => setQuery(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) {
-                  e.preventDefault();
-                  handleAsk();
-                }
-              }}
-              placeholder="What is my total spending this month?"
-            />
-            <p className="text-xs text-gray-500 mt-1">
-              Press Cmd/Ctrl + Enter to submit
-            </p>
+            <div className="inline-flex items-center gap-2 text-xs uppercase tracking-[0.3em] text-white/60">
+              <Sparkles className="w-4 h-4 text-fuchsia-300" /> Endless Copilot
+            </div>
+            <h1 className="text-3xl font-semibold mt-2 text-white">Modern AI finance console</h1>
+            <p className="text-sm text-white/70 mt-1">Ask anything about your ledgers, get perspective instantly.</p>
           </div>
-
-          <div className="flex flex-wrap gap-2">
+          <div className="flex gap-4 text-sm">
+            <div className="px-4 py-3 rounded-2xl border border-white/10 bg-white/5">
+              <p className="text-white/60 text-xs uppercase tracking-wide">Accounts</p>
+              <p className="text-2xl font-semibold">{insightMeta.accounts ?? '—'}</p>
+            </div>
+            <div className="px-4 py-3 rounded-2xl border border-white/10 bg-white/5">
+              <p className="text-white/60 text-xs uppercase tracking-wide">Journal Entries</p>
+              <p className="text-2xl font-semibold">{insightMeta.journals ?? '—'}</p>
+            </div>
+          </div>
+        </div>
+        <div className="flex flex-wrap gap-2">
+          {quickPrompts.map(prompt => (
             <button
-              onClick={handleAsk}
-              disabled={loading || !query.trim()}
-              className="btn btn-primary"
+              key={prompt}
+              onClick={() => setQuery(prompt)}
+              className="px-4 py-2 text-sm rounded-full border border-white/10 bg-white/5 hover:bg-white/10 transition-colors"
             >
-              {loading ? "Thinking..." : "Ask AI"}
+              {prompt}
             </button>
-            {!loading && !query && (
-              <>
-                <button
-                  onClick={() => setQuery("What's my biggest expense this month?")}
-                  className="btn btn-secondary text-xs"
-                >
-                  Quick: Biggest expense?
-                </button>
-                <button
-                  onClick={() => setQuery("Which vendor am I spending the most with?")}
-                  className="btn btn-secondary text-xs"
-                >
-                  Quick: Top vendor?
-                </button>
-                <button
-                  onClick={() => setQuery("Any suggestions to reduce my costs?")}
-                  className="btn btn-secondary text-xs"
-                >
-                  Quick: Cost savings?
-                </button>
-              </>
-            )}
-          </div>
+          ))}
         </div>
       </div>
 
-      {error && (
-        <div className="card bg-red-50 border-red-200">
-          <h3 className="font-semibold text-red-900 mb-2">Error</h3>
-          <p className="text-sm text-red-700">{error}</p>
-        </div>
-      )}
+      <div className="grid lg:grid-cols-[2fr_1fr] gap-6">
+        <div className="rounded-3xl border border-white/10 bg-slate-900/70 backdrop-blur-xl overflow-hidden">
+          <div className="border-b border-white/10 p-5">
+            <label className="text-xs font-semibold uppercase tracking-widest text-white/60">Prompt Endless AI</label>
+            <div className="mt-3 flex flex-col gap-3">
+              <textarea
+                className="w-full bg-white/5 border border-white/10 rounded-2xl p-4 text-sm min-h-[110px] focus:outline-none focus:ring-2 focus:ring-fuchsia-500/60 placeholder:text-white/40"
+                rows={3}
+                value={query}
+                onChange={(e) => setQuery(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) {
+                    e.preventDefault();
+                    handleAsk();
+                  }
+                }}
+                placeholder="What signal would you like to uncover?"
+                disabled={companyBlocked}
+              />
+              {companyBlocked && (
+                <div className="text-xs text-amber-300 bg-amber-500/10 border border-amber-500/30 rounded-2xl px-4 py-2 inline-flex items-center gap-2">
+                  <Target className="w-4 h-4" /> Waiting for demo company to load. Seed data to begin.
+                </div>
+              )}
+              <div className="flex justify-between items-center">
+                <p className="text-xs text-white/40">Cmd/Ctrl + Enter to submit</p>
+                <button
+                  onClick={handleAsk}
+                  disabled={loading || !query.trim() || companyBlocked}
+                  className="inline-flex items-center gap-2 px-5 py-2 rounded-full bg-gradient-to-r from-fuchsia-500 to-indigo-500 text-sm font-medium tracking-wide disabled:opacity-40 disabled:cursor-not-allowed shadow-[0_10px_35px_rgba(129,80,255,0.4)]"
+                >
+                  <Sparkles className="w-4 h-4" />
+                  {loading ? "Thinking..." : "Generate insight"}
+                </button>
+              </div>
+            </div>
+          </div>
 
-      {answer && (
-        <div className="card bg-green-50 border-green-200">
-          <div className="flex justify-between items-start mb-3">
-            <h3 className="font-semibold text-green-900">AI Accountant Response</h3>
-            {metadata && (
-              <div className="text-xs text-green-700">
-                Based on {metadata.expense_count} expense{metadata.expense_count !== 1 ? 's' : ''}
-                {metadata.total_amount !== undefined && ` • $${metadata.total_amount.toFixed(2)} total`}
+          <div className="h-[420px] overflow-y-auto p-5 space-y-4 custom-scrollbar">
+            {messages.length === 0 && (
+              <div className="flex flex-col items-center justify-center text-center text-white/60 h-full">
+                <LineChart className="w-12 h-12 text-fuchsia-300 mb-4" />
+                <p className="max-w-sm">
+                  Ask about burn, runway, vendor spend, anomalies, or anything else. I'll blend ledger data with real-time benchmarks.
+                </p>
+              </div>
+            )}
+            {messages.map((msg, idx) => (
+              <div key={idx} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
+                <div
+                  className={`max-w-2xl rounded-3xl px-5 py-4 text-sm leading-relaxed shadow-xl ${
+                    msg.role === 'user'
+                      ? 'bg-gradient-to-r from-fuchsia-500/80 to-indigo-500/80 text-white'
+                      : 'bg-white/6 border border-white/10 text-slate-100'
+                  }`}
+                >
+                  <div className="whitespace-pre-wrap">{msg.content}</div>
+                  {msg.metadata && (
+                    <div className="text-xs mt-3 text-white/60">
+                      Based on {msg.metadata.account_count?.toLocaleString() ?? '—'} accounts • {msg.metadata.journal_count?.toLocaleString() ?? '—'} journal entries
+                    </div>
+                  )}
+                </div>
+              </div>
+            ))}
+            {loading && (
+              <div className="flex justify-start">
+                <div className="bg-white/5 border border-white/10 rounded-2xl px-4 py-3 flex items-center gap-2 text-sm text-white/60">
+                  <Loader2 className="w-4 h-4 animate-spin" /> Crunching the numbers...
+                </div>
               </div>
             )}
           </div>
-          <div className="text-sm text-green-800 whitespace-pre-wrap leading-relaxed">
-            {answer}
-          </div>
         </div>
-      )}
 
-      <div className="card bg-blue-50 border-blue-200">
-        <h3 className="font-semibold text-blue-900 mb-2">Your AI Accountant Companion</h3>
-        <p className="text-sm text-blue-800 mb-3">
-          Ask me anything about your financial data! I'm powered by OpenAI and can help you:
-        </p>
-        <ul className="list-disc list-inside text-sm text-blue-800 space-y-1">
-          <li>Analyze spending patterns and trends</li>
-          <li>Identify top vendors and categories</li>
-          <li>Get insights on cost-saving opportunities</li>
-          <li>Understand cash flow and budget allocation</li>
-          <li>Receive personalized financial recommendations</li>
-        </ul>
-        <div className="mt-4 pt-4 border-t border-blue-300">
-          <p className="text-xs text-blue-700 font-medium mb-2">Example questions:</p>
-          <ul className="text-xs text-blue-600 space-y-1">
-            <li>• "What's my biggest expense category this month?"</li>
-            <li>• "Which vendor am I spending the most with?"</li>
-            <li>• "Are my expenses trending up or down?"</li>
-            <li>• "What's my average daily spending?"</li>
-            <li>• "Any suggestions to reduce costs?"</li>
-          </ul>
+        <div className="space-y-4">
+          <div className="rounded-3xl border border-white/10 bg-white/5 backdrop-blur-xl p-5">
+            <div className="flex items-center gap-3 mb-4">
+              <Building className="w-5 h-5 text-fuchsia-300" />
+              <div>
+                <p className="text-xs uppercase tracking-[0.3em] text-white/60">Company</p>
+                <p className="text-lg font-semibold text-white">{company?.name || 'Demo Company'}</p>
+              </div>
+            </div>
+            <p className="text-sm text-white/70">
+              Endless Copilot reads your Supabase data live. Every response blends your ledger with peer benchmarks so you always have context.
+            </p>
+          </div>
+          <div className="rounded-3xl border border-white/10 bg-gradient-to-br from-slate-900 to-slate-900/80 p-5 space-y-3">
+            <h3 className="text-sm font-semibold text-white/70 uppercase tracking-widest">Power tips</h3>
+            <ul className="space-y-2 text-sm text-white/80">
+              <li>Ask for summaries plus next actions.</li>
+              <li>Reference specific accounts or vendors for precision.</li>
+              <li>Combine metrics: “Compare marketing spend to revenue growth.”</li>
+              <li>Follow up—context is carried automatically.</li>
+            </ul>
+          </div>
         </div>
       </div>
     </div>

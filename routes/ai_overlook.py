@@ -2,8 +2,39 @@ from fastapi import APIRouter, HTTPException
 import os
 from datetime import datetime
 from database import table
+import re
 
 router = APIRouter(prefix="/ai", tags=["AI Overlook"])
+
+def build_peer_context(revenue: float, expense: float) -> str:
+    revenue = revenue or 0
+    expense = expense or 0
+    peer_expense_ratio = 0.62  # simple SaaS benchmark
+    peer_margin = 0.18
+
+    if revenue <= 0:
+        return "Comparable SaaS companies typically spend ~62% of revenue on operating costs and run ~18% net margins."
+
+    company_exp_ratio = expense / revenue
+    company_margin = (revenue - expense) / revenue
+
+    return (
+        f"SaaS peers spend ~{peer_expense_ratio * 100:.0f}% of revenue and run ~{peer_margin * 100:.0f}% margins; "
+        f"you're tracking at {company_exp_ratio * 100:.0f}% spend and {company_margin * 100:.0f}% margins."
+    )
+
+def clean_ai_response(answer: str, peer_context: str) -> str:
+    if not answer:
+        return answer
+
+    cleaned = re.sub(r"\*\*(.*?)\*\*", r"\1", answer)
+    cleaned = cleaned.replace("•", "-").replace("*", "")
+    cleaned = " ".join(cleaned.split())
+
+    if peer_context.lower() not in cleaned.lower():
+        cleaned = f"{cleaned} Peer snapshot: {peer_context}"
+
+    return cleaned.strip()
 
 
 def get_ai_suggestions(company_id: str, vendor_name: str, amount: float, date: str, category: str = None, memo: str = None):
@@ -141,7 +172,8 @@ def overlook_expense(expense_data: dict):
 @router.post("/query")
 def ai_query(query_data: dict):
     """
-    AI-powered financial assistant that answers questions about your expenses.
+    AI-powered financial assistant that answers questions about your financial data.
+    Analyzes journal entries, chart of accounts, and account balances.
     Acts as a helpful, friendly accountant companion.
     """
     try:
@@ -162,57 +194,121 @@ def ai_query(query_data: dict):
                 detail="AI assistant requires OPENAI_API_KEY to be configured. Please add it to your .env file."
             )
 
-        # Fetch expense data for the company
+        # Fetch all financial data for the company
         try:
-            expenses_resp = table("bills").select("*, vendors(name)").eq("company_id", company_id).execute()
-            expenses = expenses_resp.data or []
-        except Exception as e:
-            raise HTTPException(status_code=500, detail=f"Error fetching expense data: {str(e)}")
+            # Get chart of accounts with balances
+            accounts_resp = table("accounts").select("*").eq("company_id", company_id).execute()
+            accounts = accounts_resp.data or []
 
-        # Prepare expense summary for AI
-        if not expenses:
+            # Get journal entries with lines
+            journals_resp = table("journal_entries").select("*, journal_lines(*)").eq("company_id", company_id).execute()
+            journals = journals_resp.data or []
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=f"Error fetching financial data: {str(e)}")
+
+        # Check if we have any financial data
+        if not accounts and not journals:
             return {
-                "answer": "I don't see any expenses recorded yet for your company. Once you start recording expenses, I'll be able to help you analyze your spending patterns, identify trends, and answer questions about your financial data!",
-                "expense_count": 0
+                "answer": "I don't see any financial data recorded yet for your company. Once you set up your chart of accounts and start recording journal entries, I'll be able to help you analyze your financial position, identify trends, and answer questions about your accounts!",
+                "account_count": 0,
+                "journal_count": 0
             }
 
-        # Build a concise summary of expenses for the AI
-        total_amount = sum(exp.get("total_amount", 0) for exp in expenses)
-        expense_count = len(expenses)
+        # Build comprehensive financial summary for AI
 
-        # Group by vendor
-        vendor_totals = {}
-        for exp in expenses:
-            vendor = exp.get("vendors", {}).get("name", "Unknown") if exp.get("vendors") else "Unknown"
-            amount = exp.get("total_amount", 0)
-            vendor_totals[vendor] = vendor_totals.get(vendor, 0) + amount
+        # 1. Account Summary by Type
+        account_types = {}
+        for acc in accounts:
+            acc_type = acc.get("account_type", "Unknown")
+            balance = acc.get("current_balance", 0)
+            if acc_type not in account_types:
+                account_types[acc_type] = {"count": 0, "total_balance": 0, "accounts": []}
+            account_types[acc_type]["count"] += 1
+            account_types[acc_type]["total_balance"] += balance
+            account_types[acc_type]["accounts"].append({
+                "code": acc.get("account_code", ""),
+                "name": acc.get("account_name", ""),
+                "balance": balance
+            })
 
-        # Recent expenses (last 10)
-        recent_expenses = expenses[-10:] if len(expenses) > 10 else expenses
+        totals_by_type = {
+            acc_type: data["total_balance"]
+            for acc_type, data in account_types.items()
+        }
+        peer_context = build_peer_context(
+            totals_by_type.get("revenue", 0),
+            totals_by_type.get("expense", 0)
+        )
+
+        # 2. Journal Entry Summary
+        total_journal_entries = len(journals)
+        total_debits = 0
+        total_credits = 0
+
+        for journal in journals:
+            journal_lines = journal.get("journal_lines", [])
+            for line in journal_lines:
+                total_debits += line.get("debit", 0)
+                total_credits += line.get("credit", 0)
+
+        # Recent journals (last 10)
+        recent_journals = journals[-10:] if len(journals) > 10 else journals
 
         # Build context for AI
-        context = f"""Company Expense Data Summary:
-- Total Expenses: {expense_count}
-- Total Amount: ${total_amount:.2f}
-- Average Expense: ${total_amount/expense_count:.2f}
+        context = f"""Company Financial Data Summary:
 
-Top Vendors by Spending:
+CHART OF ACCOUNTS:
+- Total Accounts: {len(accounts)}
 """
-        # Add top 5 vendors
-        sorted_vendors = sorted(vendor_totals.items(), key=lambda x: x[1], reverse=True)[:5]
-        for vendor, amount in sorted_vendors:
-            context += f"- {vendor}: ${amount:.2f}\n"
 
-        context += "\nRecent Expenses:\n"
-        for exp in recent_expenses:
-            vendor = exp.get("vendors", {}).get("name", "Unknown") if exp.get("vendors") else "Unknown"
-            amount = exp.get("total_amount", 0)
-            date = exp.get("bill_date", "N/A")
-            memo = exp.get("memo", "")
-            context += f"- {date}: {vendor} - ${amount:.2f}"
-            if memo:
-                context += f" ({memo})"
-            context += "\n"
+        # Add accounts by type
+        for acc_type, data in account_types.items():
+            context += f"\n{acc_type.upper()} Accounts ({data['count']}):\n"
+            context += f"  Total Balance: ${data['total_balance']:.2f}\n"
+            # Show top 5 accounts by balance for this type
+            sorted_accounts = sorted(data['accounts'], key=lambda x: abs(x['balance']), reverse=True)[:5]
+            for acc in sorted_accounts:
+                context += f"  - {acc['code']}: {acc['name']} = ${acc['balance']:.2f}\n"
+
+        context += f"""
+JOURNAL ENTRIES:
+- Total Journal Entries: {total_journal_entries}
+- Total Debits: ${total_debits:.2f}
+- Total Credits: ${total_credits:.2f}
+- Balance Check: {'✓ Balanced' if abs(total_debits - total_credits) < 0.01 else '✗ IMBALANCED'}
+
+Recent Journal Entries:
+"""
+        for journal in recent_journals:
+            entry_date = journal.get("entry_date", "N/A")
+            memo = journal.get("memo", "No memo")
+            status = journal.get("status", "unknown")
+            context += f"- {entry_date}: {memo} (Status: {status})\n"
+
+            # Show journal lines
+            journal_lines = journal.get("journal_lines", [])
+            for line in journal_lines:
+                # Get account name
+                account_id = line.get("account_id")
+                account_name = "Unknown Account"
+                for acc in accounts:
+                    if acc.get("id") == account_id:
+                        account_name = f"{acc.get('account_code')} - {acc.get('account_name')}"
+                        break
+
+                debit = line.get("debit", 0)
+                credit = line.get("credit", 0)
+                line_desc = line.get("description", "")
+
+                if debit > 0:
+                    context += f"    DR {account_name}: ${debit:.2f}"
+                else:
+                    context += f"    CR {account_name}: ${credit:.2f}"
+                if line_desc:
+                    context += f" ({line_desc})"
+                context += "\n"
+
+        context += f"\nPeer Benchmark: {peer_context}\n"
 
         # Call OpenAI
         try:
@@ -222,18 +318,18 @@ Top Vendors by Spending:
             system_prompt = """You are a helpful, friendly AI accountant companion for a small business.
 Your role is to help the user understand their financial data, identify trends, and make informed decisions.
 
-Be conversational, warm, and encouraging. Use clear language without too much jargon.
+Be conversational, warm, and encouraging. Use clear language without too much jargon or markdown formatting.
 When discussing numbers, be specific and helpful. Offer insights and suggestions when appropriate.
 
 Think of yourself as a knowledgeable friend who happens to be great with numbers and finances."""
 
-            user_prompt = f"""Based on the following expense data, please answer the user's question:
+            user_prompt = f"""Based on the following financial data, please answer the user's question:
 
 {context}
 
 User's Question: {question}
 
-Provide a helpful, friendly response that directly answers their question. If you notice any interesting patterns or have helpful suggestions, feel free to mention them!"""
+Provide a crisp, two-paragraph response with short sentences. Avoid markdown styling, keep the tone confident, and explicitly reference the peer benchmark in your final sentence so the reader understands how they compare to similar companies."""
 
             response = client.chat.completions.create(
                 model="gpt-4o-mini",
@@ -245,12 +341,15 @@ Provide a helpful, friendly response that directly answers their question. If yo
                 max_tokens=500
             )
 
-            answer = response.choices[0].message.content
+            raw_answer = response.choices[0].message.content
+            answer = clean_ai_response(raw_answer, peer_context)
 
             return {
                 "answer": answer,
-                "expense_count": expense_count,
-                "total_amount": total_amount
+                "account_count": len(accounts),
+                "journal_count": total_journal_entries,
+                "total_debits": total_debits,
+                "total_credits": total_credits
             }
 
         except Exception as e:
