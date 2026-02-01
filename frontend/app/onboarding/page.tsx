@@ -1,11 +1,11 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import { useAuth } from '@/contexts/AuthContext'
 import { api } from '@/lib/api'
 import { useTheme } from '@/contexts/ThemeContext'
-import { Building2, Users, TrendingUp, CheckCircle2, ArrowRight, ArrowLeft } from 'lucide-react'
+import { Building2, Users, TrendingUp, CheckCircle2, ArrowRight, ArrowLeft, Sparkles, Sun, Moon } from 'lucide-react'
 
 const INDUSTRIES = [
   'SaaS / Software',
@@ -31,10 +31,10 @@ const BUSINESS_TYPES = [
 ]
 
 const GROWTH_STAGES = [
-  { value: 'startup', label: 'Startup (0-2 years)' },
-  { value: 'growth', label: 'Growth (2-5 years)' },
-  { value: 'mature', label: 'Mature (5+ years)' },
-  { value: 'enterprise', label: 'Enterprise (established)' }
+  { value: 'startup', label: 'Startup (0-2 years)', description: 'Just getting started' },
+  { value: 'growth', label: 'Growth (2-5 years)', description: 'Scaling up' },
+  { value: 'mature', label: 'Mature (5+ years)', description: 'Established business' },
+  { value: 'enterprise', label: 'Enterprise', description: 'Large organization' }
 ]
 
 const US_STATES = [
@@ -45,13 +45,23 @@ const US_STATES = [
   'SD', 'TN', 'TX', 'UT', 'VT', 'VA', 'WA', 'WV', 'WI', 'WY'
 ]
 
+const STEP_INFO = [
+  { title: 'Company Basics', subtitle: 'Tell us about your business', icon: Building2 },
+  { title: 'Business Profile', subtitle: 'Help us understand your size', icon: Users },
+  { title: 'Market Context', subtitle: 'Enable AI-powered insights', icon: TrendingUp },
+  { title: 'All Set!', subtitle: 'Your profile is complete', icon: CheckCircle2 }
+]
+
 export default function OnboardingPage() {
   const router = useRouter()
   const { user, refreshUser } = useAuth()
-  const { theme } = useTheme()
+  const { theme, toggleTheme } = useTheme()
   const [step, setStep] = useState(1)
   const [loading, setLoading] = useState(false)
+  const [initialLoading, setInitialLoading] = useState(true)
   const [companyId, setCompanyId] = useState('')
+  const [mounted, setMounted] = useState(false)
+  const [error, setError] = useState('')
 
   const [formData, setFormData] = useState({
     // Step 1: Company Basics
@@ -82,6 +92,10 @@ export default function OnboardingPage() {
   const [competitorInput, setCompetitorInput] = useState('')
 
   useEffect(() => {
+    setMounted(true)
+  }, [])
+
+  useEffect(() => {
     // Load existing company data if available
     const loadCompanyData = async () => {
       try {
@@ -100,24 +114,29 @@ export default function OnboardingPage() {
 
           // Resume from last step if onboarding not completed
           if (!company.onboarding_completed && company.onboarding_step) {
-            setStep(company.onboarding_step)
+            setStep(Math.min(company.onboarding_step, 3)) // Don't go to step 4 automatically
           }
         }
       } catch (error) {
         console.error('Failed to load company data:', error)
+      } finally {
+        setInitialLoading(false)
       }
     }
 
     if (user) {
       loadCompanyData()
+    } else {
+      setInitialLoading(false)
     }
   }, [user])
 
-  const handleInputChange = (field: string, value: any) => {
+  const handleInputChange = useCallback((field: string, value: any) => {
     setFormData(prev => ({ ...prev, [field]: value }))
-  }
+    setError('') // Clear errors on input change
+  }, [])
 
-  const addProduct = () => {
+  const addProduct = useCallback(() => {
     if (productInput.trim()) {
       setFormData(prev => ({
         ...prev,
@@ -125,16 +144,16 @@ export default function OnboardingPage() {
       }))
       setProductInput('')
     }
-  }
+  }, [productInput])
 
-  const removeProduct = (index: number) => {
+  const removeProduct = useCallback((index: number) => {
     setFormData(prev => ({
       ...prev,
       primary_products: prev.primary_products.filter((_, i) => i !== index)
     }))
-  }
+  }, [])
 
-  const addCompetitor = () => {
+  const addCompetitor = useCallback(() => {
     if (competitorInput.trim()) {
       setFormData(prev => ({
         ...prev,
@@ -142,61 +161,51 @@ export default function OnboardingPage() {
       }))
       setCompetitorInput('')
     }
-  }
+  }, [competitorInput])
 
-  const removeCompetitor = (index: number) => {
+  const removeCompetitor = useCallback((index: number) => {
     setFormData(prev => ({
       ...prev,
       competitors: prev.competitors.filter((_, i) => i !== index)
     }))
-  }
+  }, [])
 
-  const saveProgress = async (currentStep: number): Promise<boolean> => {
+  const saveProgress = async (targetStep: number, isComplete: boolean = false): Promise<boolean> => {
     try {
       setLoading(true)
+      setError('')
 
       const updateData = {
         ...formData,
-        onboarding_step: currentStep,
-        onboarding_completed: currentStep === 4
+        onboarding_step: targetStep,
+        onboarding_completed: isComplete
       }
 
-      console.log('Saving progress for step:', currentStep, 'Data:', updateData)
-
       if (companyId) {
-        const response = await api.patch(`/companies/${companyId}`, updateData)
-        console.log('Company updated successfully:', response)
+        await api.patch(`/companies/${companyId}`, updateData)
       } else {
-        console.log('Creating new company...')
         const response = await api.post('/companies/', updateData)
-        console.log('Company creation response:', response)
 
         // Backend returns { status: "success", data: [...] }
         if (response.status === 'success' && response.data && response.data.length > 0) {
           const newCompanyId = response.data[0].id
-          console.log('New company created with ID:', newCompanyId)
           setCompanyId(newCompanyId)
 
           // Update user with company_id
           if (user) {
-            console.log('Updating user with company_id...')
             await api.patch(`/users/${user.id}`, {
               company_id: newCompanyId
             })
-            console.log('User updated successfully')
           }
         } else {
-          console.error('Invalid response structure:', response)
-          throw new Error('Failed to create company - invalid response')
+          throw new Error('Failed to create company')
         }
       }
 
-      console.log('Progress saved successfully')
       return true
     } catch (error: any) {
       console.error('Failed to save progress:', error)
-      console.error('Error details:', error.response?.data || error.message)
-      alert(`Failed to save progress: ${error.response?.data?.detail || error.message}`)
+      setError(error.response?.data?.detail || error.message || 'Failed to save. Please try again.')
       return false
     } finally {
       setLoading(false)
@@ -204,412 +213,40 @@ export default function OnboardingPage() {
   }
 
   const nextStep = async () => {
-    const success = await saveProgress(step + 1)
-    if (success) {
-      setStep(step + 1)
+    // Optimistic UI - immediately show next step
+    const nextStepNum = step + 1
+    setStep(nextStepNum)
+
+    // Save in background
+    const success = await saveProgress(nextStepNum)
+    if (!success) {
+      // Revert on failure
+      setStep(step)
     }
   }
 
   const prevStep = () => {
     setStep(step - 1)
+    setError('')
   }
 
   const completeOnboarding = async () => {
-    const success = await saveProgress(4)
+    setLoading(true)
+    const success = await saveProgress(4, true)
     if (success) {
       // Refresh auth context to get updated company data
       await refreshUser()
       router.push('/new-dashboard')
     }
+    setLoading(false)
   }
 
-  const renderStep = () => {
+  const canProceed = useCallback(() => {
     switch (step) {
       case 1:
-        return (
-          <div className="space-y-6">
-            <div className="flex items-center gap-3 mb-8">
-              <div className="p-3 rounded-xl backdrop-blur-xl" style={{ backgroundColor: 'var(--bg-card)', border: '1px solid var(--border-color)' }}>
-                <Building2 className="w-6 h-6" style={{ color: 'var(--neon-cyan)' }} />
-              </div>
-              <div>
-                <h2 className="text-2xl font-bold" style={{ color: 'var(--text-primary)' }}>Company Basics</h2>
-                <p style={{ color: 'var(--text-secondary)' }}>Let's start with the essentials</p>
-              </div>
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium mb-2" style={{ color: 'var(--text-primary)' }}>Company Name *</label>
-              <input
-                type="text"
-                value={formData.name}
-                onChange={(e) => handleInputChange('name', e.target.value)}
-                className="w-full px-4 py-3 rounded-lg focus:outline-none focus:ring-2 transition-all"
-                style={{
-                  backgroundColor: 'var(--bg-primary)',
-                  border: '1px solid var(--border-color)',
-                  color: 'var(--text-primary)',
-                  boxShadow: theme === 'dark' ? '0 0 20px rgba(34, 211, 238, 0.1)' : 'none'
-                }}
-                placeholder="Acme Inc."
-                required
-              />
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium mb-2" style={{ color: 'var(--text-primary)' }}>Industry *</label>
-              <select
-                value={formData.industry}
-                onChange={(e) => handleInputChange('industry', e.target.value)}
-                className="w-full px-4 py-3 rounded-lg focus:outline-none focus:ring-2 transition-all"
-                style={{
-                  backgroundColor: 'var(--bg-primary)',
-                  border: '1px solid var(--border-color)',
-                  color: 'var(--text-primary)'
-                }}
-                required
-              >
-                <option value="">Select your industry</option>
-                {INDUSTRIES.map(industry => (
-                  <option key={industry} value={industry}>{industry}</option>
-                ))}
-              </select>
-            </div>
-
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <label className="block text-sm font-medium mb-2" style={{ color: 'var(--text-primary)' }}>City *</label>
-                <input
-                  type="text"
-                  value={formData.location_city}
-                  onChange={(e) => handleInputChange('location_city', e.target.value)}
-                  className="w-full px-4 py-3 rounded-lg focus:outline-none focus:ring-2 transition-all"
-                  style={{
-                    backgroundColor: 'var(--bg-primary)',
-                    border: '1px solid var(--border-color)',
-                    color: 'var(--text-primary)'
-                  }}
-                  placeholder="San Francisco"
-                  required
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium mb-2" style={{ color: 'var(--text-primary)' }}>State *</label>
-                <select
-                  value={formData.location_state}
-                  onChange={(e) => handleInputChange('location_state', e.target.value)}
-                  className="w-full px-4 py-3 rounded-lg focus:outline-none focus:ring-2 transition-all"
-                  style={{
-                    backgroundColor: 'var(--bg-primary)',
-                    border: '1px solid var(--border-color)',
-                    color: 'var(--text-primary)'
-                  }}
-                  required
-                >
-                  <option value="">Select state</option>
-                  {US_STATES.map(state => (
-                    <option key={state} value={state}>{state}</option>
-                  ))}
-                </select>
-              </div>
-            </div>
-          </div>
-        )
-
+        return !!(formData.name && formData.industry && formData.location_city && formData.location_state)
       case 2:
-        return (
-          <div className="space-y-6">
-            <div className="flex items-center gap-3 mb-8">
-              <div className="p-3 rounded-xl backdrop-blur-xl" style={{ backgroundColor: 'var(--bg-card)', border: '1px solid var(--border-color)' }}>
-                <Users className="w-6 h-6" style={{ color: 'var(--neon-fuchsia)' }} />
-              </div>
-              <div>
-                <h2 className="text-2xl font-bold" style={{ color: 'var(--text-primary)' }}>Business Profile</h2>
-                <p style={{ color: 'var(--text-secondary)' }}>Help us understand your business size and structure</p>
-              </div>
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium mb-2" style={{ color: 'var(--text-primary)' }}>Business Type *</label>
-              <select
-                value={formData.business_type}
-                onChange={(e) => handleInputChange('business_type', e.target.value)}
-                className="w-full px-4 py-3 rounded-lg focus:outline-none focus:ring-2 transition-all"
-                style={{
-                  backgroundColor: 'var(--bg-primary)',
-                  border: '1px solid var(--border-color)',
-                  color: 'var(--text-primary)'
-                }}
-                required
-              >
-                <option value="">Select business type</option>
-                {BUSINESS_TYPES.map(type => (
-                  <option key={type.value} value={type.value}>{type.label}</option>
-                ))}
-              </select>
-            </div>
-
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <label className="block text-sm font-medium mb-2" style={{ color: 'var(--text-primary)' }}>Founded Year</label>
-                <input
-                  type="number"
-                  value={formData.founded_year}
-                  onChange={(e) => handleInputChange('founded_year', parseInt(e.target.value))}
-                  className="w-full px-4 py-3 rounded-lg focus:outline-none focus:ring-2 transition-all"
-                  style={{
-                    backgroundColor: 'var(--bg-primary)',
-                    border: '1px solid var(--border-color)',
-                    color: 'var(--text-primary)'
-                  }}
-                  min="1900"
-                  max={new Date().getFullYear()}
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium mb-2" style={{ color: 'var(--text-primary)' }}>Number of Employees</label>
-                <input
-                  type="number"
-                  value={formData.employee_count}
-                  onChange={(e) => handleInputChange('employee_count', parseInt(e.target.value))}
-                  className="w-full px-4 py-3 rounded-lg focus:outline-none focus:ring-2 transition-all"
-                  style={{
-                    backgroundColor: 'var(--bg-primary)',
-                    border: '1px solid var(--border-color)',
-                    color: 'var(--text-primary)'
-                  }}
-                  min="1"
-                />
-              </div>
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium mb-2" style={{ color: 'var(--text-primary)' }}>Annual Revenue (USD)</label>
-              <input
-                type="number"
-                value={formData.annual_revenue}
-                onChange={(e) => handleInputChange('annual_revenue', parseFloat(e.target.value))}
-                className="w-full px-4 py-3 rounded-lg focus:outline-none focus:ring-2 transition-all"
-                style={{
-                  backgroundColor: 'var(--bg-primary)',
-                  border: '1px solid var(--border-color)',
-                  color: 'var(--text-primary)'
-                }}
-                placeholder="100000"
-                min="0"
-              />
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium mb-2" style={{ color: 'var(--text-primary)' }}>Growth Stage *</label>
-              <select
-                value={formData.growth_stage}
-                onChange={(e) => handleInputChange('growth_stage', e.target.value)}
-                className="w-full px-4 py-3 rounded-lg focus:outline-none focus:ring-2 transition-all"
-                style={{
-                  backgroundColor: 'var(--bg-primary)',
-                  border: '1px solid var(--border-color)',
-                  color: 'var(--text-primary)'
-                }}
-                required
-              >
-                <option value="">Select growth stage</option>
-                {GROWTH_STAGES.map(stage => (
-                  <option key={stage.value} value={stage.value}>{stage.label}</option>
-                ))}
-              </select>
-            </div>
-          </div>
-        )
-
-      case 3:
-        return (
-          <div className="space-y-6">
-            <div className="flex items-center gap-3 mb-8">
-              <div className="p-3 rounded-xl backdrop-blur-xl" style={{ backgroundColor: 'var(--bg-card)', border: '1px solid var(--border-color)' }}>
-                <TrendingUp className="w-6 h-6" style={{ color: 'var(--neon-emerald)' }} />
-              </div>
-              <div>
-                <h2 className="text-2xl font-bold" style={{ color: 'var(--text-primary)' }}>Market Context</h2>
-                <p style={{ color: 'var(--text-secondary)' }}>This helps us provide better AI-powered insights</p>
-              </div>
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium mb-2" style={{ color: 'var(--text-primary)' }}>Target Market</label>
-              <select
-                value={formData.target_market}
-                onChange={(e) => handleInputChange('target_market', e.target.value)}
-                className="w-full px-4 py-3 rounded-lg focus:outline-none focus:ring-2 transition-all"
-                style={{
-                  backgroundColor: 'var(--bg-primary)',
-                  border: '1px solid var(--border-color)',
-                  color: 'var(--text-primary)'
-                }}
-              >
-                <option value="B2B">B2B (Business to Business)</option>
-                <option value="B2C">B2C (Business to Consumer)</option>
-                <option value="B2B2C">B2B2C (Both)</option>
-              </select>
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium mb-2" style={{ color: 'var(--text-primary)' }}>Primary Products/Services</label>
-              <div className="flex gap-2 mb-2">
-                <input
-                  type="text"
-                  value={productInput}
-                  onChange={(e) => setProductInput(e.target.value)}
-                  onKeyPress={(e) => e.key === 'Enter' && (e.preventDefault(), addProduct())}
-                  className="flex-1 px-4 py-3 rounded-lg focus:outline-none focus:ring-2 transition-all"
-                  style={{
-                    backgroundColor: 'var(--bg-primary)',
-                    border: '1px solid var(--border-color)',
-                    color: 'var(--text-primary)'
-                  }}
-                  placeholder="e.g., Cloud software, Consulting"
-                />
-                <button
-                  onClick={addProduct}
-                  className="px-6 py-3 rounded-lg font-medium transition-all hover:scale-105"
-                  style={{
-                    background: 'linear-gradient(135deg, var(--neon-cyan), var(--neon-fuchsia))',
-                    color: 'white'
-                  }}
-                >
-                  Add
-                </button>
-              </div>
-              <div className="flex flex-wrap gap-2">
-                {formData.primary_products.map((product, i) => (
-                  <span
-                    key={i}
-                    className="px-3 py-1 rounded-full text-sm flex items-center gap-2"
-                    style={{
-                      backgroundColor: theme === 'dark' ? 'rgba(34, 211, 238, 0.1)' : 'rgba(34, 211, 238, 0.2)',
-                      color: 'var(--neon-cyan)',
-                      border: '1px solid var(--neon-cyan)'
-                    }}
-                  >
-                    {product}
-                    <button onClick={() => removeProduct(i)} className="hover:opacity-70">&times;</button>
-                  </span>
-                ))}
-              </div>
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium mb-2" style={{ color: 'var(--text-primary)' }}>Competitors (for AI comparisons)</label>
-              <div className="flex gap-2 mb-2">
-                <input
-                  type="text"
-                  value={competitorInput}
-                  onChange={(e) => setCompetitorInput(e.target.value)}
-                  onKeyPress={(e) => e.key === 'Enter' && (e.preventDefault(), addCompetitor())}
-                  className="flex-1 px-4 py-3 rounded-lg focus:outline-none focus:ring-2 transition-all"
-                  style={{
-                    backgroundColor: 'var(--bg-primary)',
-                    border: '1px solid var(--border-color)',
-                    color: 'var(--text-primary)'
-                  }}
-                  placeholder="e.g., Competitor Inc."
-                />
-                <button
-                  onClick={addCompetitor}
-                  className="px-6 py-3 rounded-lg font-medium transition-all hover:scale-105"
-                  style={{
-                    background: 'linear-gradient(135deg, var(--neon-emerald), var(--neon-cyan))',
-                    color: 'white'
-                  }}
-                >
-                  Add
-                </button>
-              </div>
-              <div className="flex flex-wrap gap-2">
-                {formData.competitors.map((competitor, i) => (
-                  <span
-                    key={i}
-                    className="px-3 py-1 rounded-full text-sm flex items-center gap-2"
-                    style={{
-                      backgroundColor: theme === 'dark' ? 'rgba(16, 185, 129, 0.1)' : 'rgba(16, 185, 129, 0.2)',
-                      color: 'var(--neon-emerald)',
-                      border: '1px solid var(--neon-emerald)'
-                    }}
-                  >
-                    {competitor}
-                    <button onClick={() => removeCompetitor(i)} className="hover:opacity-70">&times;</button>
-                  </span>
-                ))}
-              </div>
-            </div>
-          </div>
-        )
-
-      case 4:
-        return (
-          <div className="space-y-8 text-center">
-            <div className="flex justify-center">
-              <div className="p-6 rounded-full" style={{ backgroundColor: 'rgba(34, 211, 238, 0.1)' }}>
-                <CheckCircle2 className="w-20 h-20" style={{ color: 'var(--neon-cyan)' }} />
-              </div>
-            </div>
-            <div>
-              <h2 className="text-4xl font-bold mb-4" style={{ color: 'var(--text-primary)' }}>You're All Set!</h2>
-              <p className="text-lg" style={{ color: 'var(--text-secondary)' }}>
-                Your profile is complete. You can now access:
-              </p>
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-left mt-8">
-              {[
-                { icon: '📊', title: 'Industry Benchmarks', desc: 'See how you compare to similar businesses' },
-                { icon: '🎯', title: 'Competitor Analysis', desc: 'Real-time insights on your competitive landscape' },
-                { icon: '📈', title: 'Growth Recommendations', desc: 'Personalized strategies from similar companies' },
-                { icon: '📋', title: 'Tax Updates', desc: 'Latest compliance requirements for your state' }
-              ].map((feature, i) => (
-                <div
-                  key={i}
-                  className="p-6 rounded-xl backdrop-blur-xl border transition-all hover:scale-105"
-                  style={{
-                    backgroundColor: 'var(--bg-card)',
-                    borderColor: 'var(--border-color)',
-                    boxShadow: theme === 'dark' ? '0 0 30px rgba(217, 70, 239, 0.1)' : 'none'
-                  }}
-                >
-                  <div className="text-3xl mb-3">{feature.icon}</div>
-                  <h3 className="font-semibold mb-2" style={{ color: 'var(--text-primary)' }}>{feature.title}</h3>
-                  <p className="text-sm" style={{ color: 'var(--text-secondary)' }}>{feature.desc}</p>
-                </div>
-              ))}
-            </div>
-
-            <p className="text-sm mt-8" style={{ color: 'var(--text-secondary)' }}>
-              Powered by Perplexity AI for real-time market intelligence
-            </p>
-          </div>
-        )
-
-      default:
-        return null
-    }
-  }
-
-  const canProceed = () => {
-    switch (step) {
-      case 1:
-        const step1Valid = formData.name && formData.industry && formData.location_city && formData.location_state
-        console.log('Step 1 validation:', {
-          name: !!formData.name,
-          industry: !!formData.industry,
-          location_city: !!formData.location_city,
-          location_state: !!formData.location_state,
-          canProceed: step1Valid
-        })
-        return step1Valid
-      case 2:
-        return formData.business_type && formData.growth_stage
+        return !!(formData.business_type && formData.growth_stage)
       case 3:
         return true // Optional fields
       case 4:
@@ -617,6 +254,26 @@ export default function OnboardingPage() {
       default:
         return false
     }
+  }, [step, formData])
+
+  const StepIcon = STEP_INFO[step - 1]?.icon || Building2
+
+  if (!mounted || initialLoading) {
+    return (
+      <div
+        className="flex items-center justify-center h-screen transition-colors duration-300"
+        style={{ backgroundColor: 'var(--bg-primary)' }}
+      >
+        <div className="flex flex-col items-center gap-4">
+          <div className="flex items-center gap-2">
+            <div className="w-2 h-2 rounded-full animate-pulse" style={{ backgroundColor: 'var(--neon-emerald)' }}></div>
+            <div className="w-2 h-2 rounded-full animate-pulse" style={{ backgroundColor: 'var(--neon-cyan)', animationDelay: '0.2s' }}></div>
+            <div className="w-2 h-2 rounded-full animate-pulse" style={{ backgroundColor: 'var(--neon-fuchsia)', animationDelay: '0.4s' }}></div>
+          </div>
+          <p className="text-sm" style={{ color: 'var(--text-muted)' }}>Loading your profile...</p>
+        </div>
+      </div>
+    )
   }
 
   return (
@@ -640,8 +297,21 @@ export default function OnboardingPage() {
         />
       </div>
 
+      {/* Theme toggle */}
+      <button
+        onClick={toggleTheme}
+        className="fixed top-4 right-4 p-2 rounded-lg transition-colors z-50"
+        style={{ backgroundColor: 'var(--bg-secondary)', border: '1px solid var(--border-color)' }}
+      >
+        {theme === 'dark' ? (
+          <Sun className="w-5 h-5" style={{ color: 'var(--neon-cyan)' }} />
+        ) : (
+          <Moon className="w-5 h-5" style={{ color: 'var(--neon-fuchsia)' }} />
+        )}
+      </button>
+
       <div
-        className="max-w-3xl w-full rounded-2xl backdrop-blur-xl p-8 md:p-12 relative z-10 border transition-all"
+        className="max-w-2xl w-full rounded-2xl backdrop-blur-xl p-8 md:p-10 relative z-10 border transition-all"
         style={{
           backgroundColor: 'var(--bg-card)',
           borderColor: 'var(--border-color)',
@@ -650,13 +320,14 @@ export default function OnboardingPage() {
             : '0 20px 60px rgba(0, 0, 0, 0.1)'
         }}
       >
-        {/* Progress Indicator */}
-        <div className="mb-10">
-          <div className="flex justify-between items-center mb-3">
+        {/* Progress Header */}
+        <div className="mb-8">
+          {/* Step indicator pills */}
+          <div className="flex gap-2 mb-4">
             {[1, 2, 3, 4].map(i => (
               <div
                 key={i}
-                className="flex-1 h-2 rounded-full mx-1 transition-all duration-500"
+                className="flex-1 h-1.5 rounded-full transition-all duration-500"
                 style={{
                   background: i <= step
                     ? 'linear-gradient(90deg, var(--neon-cyan), var(--neon-fuchsia))'
@@ -665,14 +336,436 @@ export default function OnboardingPage() {
               />
             ))}
           </div>
-          <div className="text-sm text-center font-medium" style={{ color: 'var(--text-secondary)' }}>
-            Step {step} of 4
+
+          {/* Step info */}
+          <div className="flex items-center gap-4">
+            <div
+              className="p-3 rounded-xl transition-colors"
+              style={{
+                backgroundColor: theme === 'dark' ? 'rgba(34, 211, 238, 0.1)' : 'rgba(34, 211, 238, 0.15)',
+                border: '1px solid var(--neon-cyan)'
+              }}
+            >
+              <StepIcon className="w-6 h-6" style={{ color: 'var(--neon-cyan)' }} />
+            </div>
+            <div>
+              <h2 className="text-xl font-bold" style={{ color: 'var(--text-primary)' }}>
+                {STEP_INFO[step - 1]?.title}
+              </h2>
+              <p className="text-sm" style={{ color: 'var(--text-secondary)' }}>
+                Step {step} of 4 • {STEP_INFO[step - 1]?.subtitle}
+              </p>
+            </div>
           </div>
         </div>
 
+        {/* Error message */}
+        {error && (
+          <div
+            className="mb-6 p-3 rounded-lg text-sm"
+            style={{
+              backgroundColor: theme === 'dark' ? 'rgba(239, 68, 68, 0.1)' : 'rgba(239, 68, 68, 0.1)',
+              border: '1px solid rgba(239, 68, 68, 0.5)',
+              color: '#ef4444'
+            }}
+          >
+            {error}
+          </div>
+        )}
+
         {/* Step Content */}
-        <div className="mb-10">
-          {renderStep()}
+        <div className="mb-8">
+          {step === 1 && (
+            <div className="space-y-5">
+              <div>
+                <label className="block text-sm font-medium mb-2" style={{ color: 'var(--text-primary)' }}>
+                  Company Name <span style={{ color: 'var(--neon-fuchsia)' }}>*</span>
+                </label>
+                <input
+                  type="text"
+                  value={formData.name}
+                  onChange={(e) => handleInputChange('name', e.target.value)}
+                  className="w-full px-4 py-3 rounded-lg focus:outline-none focus:ring-2 transition-all"
+                  style={{
+                    backgroundColor: 'var(--bg-primary)',
+                    border: '1px solid var(--border-color)',
+                    color: 'var(--text-primary)'
+                  }}
+                  placeholder="Acme Inc."
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium mb-2" style={{ color: 'var(--text-primary)' }}>
+                  Industry <span style={{ color: 'var(--neon-fuchsia)' }}>*</span>
+                </label>
+                <select
+                  value={formData.industry}
+                  onChange={(e) => handleInputChange('industry', e.target.value)}
+                  className="w-full px-4 py-3 rounded-lg focus:outline-none focus:ring-2 transition-all"
+                  style={{
+                    backgroundColor: 'var(--bg-primary)',
+                    border: '1px solid var(--border-color)',
+                    color: 'var(--text-primary)'
+                  }}
+                >
+                  <option value="">Select your industry</option>
+                  {INDUSTRIES.map(industry => (
+                    <option key={industry} value={industry}>{industry}</option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium mb-2" style={{ color: 'var(--text-primary)' }}>
+                    City <span style={{ color: 'var(--neon-fuchsia)' }}>*</span>
+                  </label>
+                  <input
+                    type="text"
+                    value={formData.location_city}
+                    onChange={(e) => handleInputChange('location_city', e.target.value)}
+                    className="w-full px-4 py-3 rounded-lg focus:outline-none focus:ring-2 transition-all"
+                    style={{
+                      backgroundColor: 'var(--bg-primary)',
+                      border: '1px solid var(--border-color)',
+                      color: 'var(--text-primary)'
+                    }}
+                    placeholder="San Francisco"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium mb-2" style={{ color: 'var(--text-primary)' }}>
+                    State <span style={{ color: 'var(--neon-fuchsia)' }}>*</span>
+                  </label>
+                  <select
+                    value={formData.location_state}
+                    onChange={(e) => handleInputChange('location_state', e.target.value)}
+                    className="w-full px-4 py-3 rounded-lg focus:outline-none focus:ring-2 transition-all"
+                    style={{
+                      backgroundColor: 'var(--bg-primary)',
+                      border: '1px solid var(--border-color)',
+                      color: 'var(--text-primary)'
+                    }}
+                  >
+                    <option value="">State</option>
+                    {US_STATES.map(state => (
+                      <option key={state} value={state}>{state}</option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+
+              <p className="text-xs" style={{ color: 'var(--text-muted)' }}>
+                This helps us provide relevant industry benchmarks and tax information.
+              </p>
+            </div>
+          )}
+
+          {step === 2 && (
+            <div className="space-y-5">
+              <div>
+                <label className="block text-sm font-medium mb-2" style={{ color: 'var(--text-primary)' }}>
+                  Business Type <span style={{ color: 'var(--neon-fuchsia)' }}>*</span>
+                </label>
+                <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
+                  {BUSINESS_TYPES.map(type => (
+                    <button
+                      key={type.value}
+                      type="button"
+                      onClick={() => handleInputChange('business_type', type.value)}
+                      className="p-3 rounded-lg text-sm font-medium transition-all text-left"
+                      style={{
+                        backgroundColor: formData.business_type === type.value
+                          ? theme === 'dark' ? 'rgba(34, 211, 238, 0.15)' : 'rgba(34, 211, 238, 0.2)'
+                          : 'var(--bg-primary)',
+                        border: formData.business_type === type.value
+                          ? '1px solid var(--neon-cyan)'
+                          : '1px solid var(--border-color)',
+                        color: formData.business_type === type.value
+                          ? 'var(--neon-cyan)'
+                          : 'var(--text-primary)'
+                      }}
+                    >
+                      {type.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium mb-2" style={{ color: 'var(--text-primary)' }}>Founded Year</label>
+                  <input
+                    type="number"
+                    value={formData.founded_year}
+                    onChange={(e) => handleInputChange('founded_year', parseInt(e.target.value))}
+                    className="w-full px-4 py-3 rounded-lg focus:outline-none focus:ring-2 transition-all"
+                    style={{
+                      backgroundColor: 'var(--bg-primary)',
+                      border: '1px solid var(--border-color)',
+                      color: 'var(--text-primary)'
+                    }}
+                    min="1900"
+                    max={new Date().getFullYear()}
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium mb-2" style={{ color: 'var(--text-primary)' }}>Employees</label>
+                  <input
+                    type="number"
+                    value={formData.employee_count}
+                    onChange={(e) => handleInputChange('employee_count', parseInt(e.target.value))}
+                    className="w-full px-4 py-3 rounded-lg focus:outline-none focus:ring-2 transition-all"
+                    style={{
+                      backgroundColor: 'var(--bg-primary)',
+                      border: '1px solid var(--border-color)',
+                      color: 'var(--text-primary)'
+                    }}
+                    min="1"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium mb-2" style={{ color: 'var(--text-primary)' }}>Annual Revenue (USD)</label>
+                <input
+                  type="number"
+                  value={formData.annual_revenue || ''}
+                  onChange={(e) => handleInputChange('annual_revenue', parseFloat(e.target.value) || 0)}
+                  className="w-full px-4 py-3 rounded-lg focus:outline-none focus:ring-2 transition-all"
+                  style={{
+                    backgroundColor: 'var(--bg-primary)',
+                    border: '1px solid var(--border-color)',
+                    color: 'var(--text-primary)'
+                  }}
+                  placeholder="100000"
+                  min="0"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium mb-2" style={{ color: 'var(--text-primary)' }}>
+                  Growth Stage <span style={{ color: 'var(--neon-fuchsia)' }}>*</span>
+                </label>
+                <div className="grid grid-cols-2 gap-2">
+                  {GROWTH_STAGES.map(stage => (
+                    <button
+                      key={stage.value}
+                      type="button"
+                      onClick={() => handleInputChange('growth_stage', stage.value)}
+                      className="p-3 rounded-lg text-left transition-all"
+                      style={{
+                        backgroundColor: formData.growth_stage === stage.value
+                          ? theme === 'dark' ? 'rgba(52, 211, 153, 0.15)' : 'rgba(52, 211, 153, 0.2)'
+                          : 'var(--bg-primary)',
+                        border: formData.growth_stage === stage.value
+                          ? '1px solid var(--neon-emerald)'
+                          : '1px solid var(--border-color)'
+                      }}
+                    >
+                      <div className="text-sm font-medium" style={{
+                        color: formData.growth_stage === stage.value ? 'var(--neon-emerald)' : 'var(--text-primary)'
+                      }}>
+                        {stage.label}
+                      </div>
+                      <div className="text-xs" style={{ color: 'var(--text-muted)' }}>{stage.description}</div>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </div>
+          )}
+
+          {step === 3 && (
+            <div className="space-y-5">
+              <div
+                className="p-4 rounded-lg mb-4"
+                style={{
+                  backgroundColor: theme === 'dark' ? 'rgba(217, 70, 239, 0.1)' : 'rgba(217, 70, 239, 0.1)',
+                  border: '1px solid var(--neon-fuchsia)'
+                }}
+              >
+                <div className="flex items-center gap-2 mb-1">
+                  <Sparkles className="w-4 h-4" style={{ color: 'var(--neon-fuchsia)' }} />
+                  <span className="text-sm font-medium" style={{ color: 'var(--neon-fuchsia)' }}>AI-Powered Insights</span>
+                </div>
+                <p className="text-sm" style={{ color: 'var(--text-secondary)' }}>
+                  This optional step unlocks personalized competitor analysis and growth recommendations.
+                </p>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium mb-2" style={{ color: 'var(--text-primary)' }}>Target Market</label>
+                <div className="grid grid-cols-3 gap-2">
+                  {['B2B', 'B2C', 'B2B2C'].map(market => (
+                    <button
+                      key={market}
+                      type="button"
+                      onClick={() => handleInputChange('target_market', market)}
+                      className="p-3 rounded-lg text-sm font-medium transition-all"
+                      style={{
+                        backgroundColor: formData.target_market === market
+                          ? theme === 'dark' ? 'rgba(34, 211, 238, 0.15)' : 'rgba(34, 211, 238, 0.2)'
+                          : 'var(--bg-primary)',
+                        border: formData.target_market === market
+                          ? '1px solid var(--neon-cyan)'
+                          : '1px solid var(--border-color)',
+                        color: formData.target_market === market ? 'var(--neon-cyan)' : 'var(--text-primary)'
+                      }}
+                    >
+                      {market}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium mb-2" style={{ color: 'var(--text-primary)' }}>
+                  Products/Services <span className="text-xs" style={{ color: 'var(--text-muted)' }}>(optional)</span>
+                </label>
+                <div className="flex gap-2 mb-2">
+                  <input
+                    type="text"
+                    value={productInput}
+                    onChange={(e) => setProductInput(e.target.value)}
+                    onKeyPress={(e) => e.key === 'Enter' && (e.preventDefault(), addProduct())}
+                    className="flex-1 px-4 py-3 rounded-lg focus:outline-none focus:ring-2 transition-all"
+                    style={{
+                      backgroundColor: 'var(--bg-primary)',
+                      border: '1px solid var(--border-color)',
+                      color: 'var(--text-primary)'
+                    }}
+                    placeholder="e.g., Cloud software, Consulting"
+                  />
+                  <button
+                    type="button"
+                    onClick={addProduct}
+                    className="px-4 py-3 rounded-lg font-medium transition-all"
+                    style={{
+                      background: 'linear-gradient(135deg, var(--neon-cyan), var(--neon-fuchsia))',
+                      color: 'white'
+                    }}
+                  >
+                    Add
+                  </button>
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  {formData.primary_products.map((product, i) => (
+                    <span
+                      key={i}
+                      className="px-3 py-1 rounded-full text-sm flex items-center gap-2"
+                      style={{
+                        backgroundColor: theme === 'dark' ? 'rgba(34, 211, 238, 0.1)' : 'rgba(34, 211, 238, 0.15)',
+                        color: 'var(--neon-cyan)',
+                        border: '1px solid var(--neon-cyan)'
+                      }}
+                    >
+                      {product}
+                      <button onClick={() => removeProduct(i)} className="hover:opacity-70">&times;</button>
+                    </span>
+                  ))}
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium mb-2" style={{ color: 'var(--text-primary)' }}>
+                  Competitors <span className="text-xs" style={{ color: 'var(--text-muted)' }}>(optional - for AI analysis)</span>
+                </label>
+                <div className="flex gap-2 mb-2">
+                  <input
+                    type="text"
+                    value={competitorInput}
+                    onChange={(e) => setCompetitorInput(e.target.value)}
+                    onKeyPress={(e) => e.key === 'Enter' && (e.preventDefault(), addCompetitor())}
+                    className="flex-1 px-4 py-3 rounded-lg focus:outline-none focus:ring-2 transition-all"
+                    style={{
+                      backgroundColor: 'var(--bg-primary)',
+                      border: '1px solid var(--border-color)',
+                      color: 'var(--text-primary)'
+                    }}
+                    placeholder="e.g., Competitor Inc."
+                  />
+                  <button
+                    type="button"
+                    onClick={addCompetitor}
+                    className="px-4 py-3 rounded-lg font-medium transition-all"
+                    style={{
+                      background: 'linear-gradient(135deg, var(--neon-emerald), var(--neon-cyan))',
+                      color: 'white'
+                    }}
+                  >
+                    Add
+                  </button>
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  {formData.competitors.map((competitor, i) => (
+                    <span
+                      key={i}
+                      className="px-3 py-1 rounded-full text-sm flex items-center gap-2"
+                      style={{
+                        backgroundColor: theme === 'dark' ? 'rgba(52, 211, 153, 0.1)' : 'rgba(52, 211, 153, 0.15)',
+                        color: 'var(--neon-emerald)',
+                        border: '1px solid var(--neon-emerald)'
+                      }}
+                    >
+                      {competitor}
+                      <button onClick={() => removeCompetitor(i)} className="hover:opacity-70">&times;</button>
+                    </span>
+                  ))}
+                </div>
+              </div>
+            </div>
+          )}
+
+          {step === 4 && (
+            <div className="space-y-6 text-center py-4">
+              <div className="flex justify-center">
+                <div
+                  className="p-5 rounded-full"
+                  style={{
+                    background: 'linear-gradient(135deg, var(--neon-emerald), var(--neon-cyan))',
+                    boxShadow: theme === 'dark' ? '0 0 40px rgba(52, 211, 153, 0.4)' : '0 0 30px rgba(52, 211, 153, 0.3)'
+                  }}
+                >
+                  <CheckCircle2 className="w-12 h-12 text-white" />
+                </div>
+              </div>
+
+              <div>
+                <h3 className="text-2xl font-bold mb-2" style={{ color: 'var(--text-primary)' }}>
+                  You're all set, {formData.name}!
+                </h3>
+                <p style={{ color: 'var(--text-secondary)' }}>
+                  Your company profile is complete. Here's what you've unlocked:
+                </p>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3 text-left">
+                {[
+                  { icon: '📊', title: 'Industry Benchmarks', desc: 'Compare to peers' },
+                  { icon: '🎯', title: 'Competitor Analysis', desc: 'Market positioning' },
+                  { icon: '📈', title: 'Growth Insights', desc: 'AI recommendations' },
+                  { icon: '📋', title: 'Tax Updates', desc: 'State requirements' }
+                ].map((feature, i) => (
+                  <div
+                    key={i}
+                    className="p-4 rounded-xl"
+                    style={{
+                      backgroundColor: 'var(--bg-primary)',
+                      border: '1px solid var(--border-color)'
+                    }}
+                  >
+                    <div className="text-2xl mb-2">{feature.icon}</div>
+                    <div className="text-sm font-medium" style={{ color: 'var(--text-primary)' }}>{feature.title}</div>
+                    <div className="text-xs" style={{ color: 'var(--text-muted)' }}>{feature.desc}</div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
 
         {/* Navigation Buttons */}
@@ -680,7 +773,7 @@ export default function OnboardingPage() {
           {step > 1 && step < 4 && (
             <button
               onClick={prevStep}
-              className="px-6 py-3 rounded-lg font-medium transition-all hover:scale-105 flex items-center gap-2"
+              className="px-5 py-2.5 rounded-lg font-medium transition-all flex items-center gap-2"
               style={{
                 backgroundColor: 'var(--bg-primary)',
                 border: '1px solid var(--border-color)',
@@ -694,45 +787,64 @@ export default function OnboardingPage() {
           )}
 
           {step < 4 && (
-            <div className="ml-auto flex flex-col items-end gap-2">
-              <button
-                onClick={nextStep}
-                className="px-8 py-3 rounded-lg font-semibold transition-all hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
-                style={{
-                  background: canProceed()
-                    ? 'linear-gradient(135deg, var(--neon-cyan), var(--neon-fuchsia))'
-                    : 'rgba(128, 128, 128, 0.3)',
-                  color: 'white'
-                }}
-                disabled={!canProceed() || loading}
-              >
-                {loading ? 'Saving...' : 'Continue'}
-                <ArrowRight className="w-4 h-4" />
-              </button>
-              {!canProceed() && step === 1 && (
-                <p className="text-xs text-red-400">
-                  Please fill all required fields (*)
-                </p>
+            <button
+              onClick={nextStep}
+              className="ml-auto px-6 py-2.5 rounded-lg font-semibold transition-all hover:scale-[1.02] disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100 flex items-center gap-2"
+              style={{
+                background: canProceed()
+                  ? 'linear-gradient(135deg, var(--neon-cyan), var(--neon-fuchsia))'
+                  : 'rgba(128, 128, 128, 0.3)',
+                color: 'white',
+                boxShadow: canProceed() && theme === 'dark' ? '0 0 20px rgba(34, 211, 238, 0.2)' : 'none'
+              }}
+              disabled={!canProceed() || loading}
+            >
+              {loading ? (
+                <>
+                  <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
+                  Saving...
+                </>
+              ) : (
+                <>
+                  Continue
+                  <ArrowRight className="w-4 h-4" />
+                </>
               )}
-            </div>
+            </button>
           )}
 
           {step === 4 && (
             <button
               onClick={completeOnboarding}
-              className="w-full px-8 py-4 rounded-lg font-bold text-lg transition-all hover:scale-105 flex items-center justify-center gap-2"
+              className="w-full px-6 py-3.5 rounded-lg font-bold text-lg transition-all hover:scale-[1.02] disabled:opacity-50 flex items-center justify-center gap-2"
               style={{
                 background: 'linear-gradient(135deg, var(--neon-emerald), var(--neon-cyan))',
                 color: 'white',
-                boxShadow: theme === 'dark' ? '0 0 40px rgba(16, 185, 129, 0.3)' : 'none'
+                boxShadow: theme === 'dark' ? '0 0 30px rgba(52, 211, 153, 0.3)' : '0 4px 20px rgba(52, 211, 153, 0.2)'
               }}
               disabled={loading}
             >
-              Go to Dashboard
-              <ArrowRight className="w-5 h-5" />
+              {loading ? (
+                <>
+                  <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
+                  Setting up your dashboard...
+                </>
+              ) : (
+                <>
+                  Go to Dashboard
+                  <ArrowRight className="w-5 h-5" />
+                </>
+              )}
             </button>
           )}
         </div>
+
+        {/* Required fields note */}
+        {step < 4 && !canProceed() && (
+          <p className="text-xs text-center mt-4" style={{ color: 'var(--neon-fuchsia)' }}>
+            Please fill in all required fields marked with *
+          </p>
+        )}
       </div>
     </div>
   )
