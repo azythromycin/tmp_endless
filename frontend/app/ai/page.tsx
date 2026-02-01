@@ -85,24 +85,24 @@ export default function AIConsolePage() {
   const companyBlocked = !companyId;
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950 text-slate-100 p-8 space-y-6">
-      <div className="flex flex-col gap-4 rounded-3xl border border-white/10 bg-white/5 backdrop-blur-xl p-6">
+    <div className="min-h-screen bg-gradient-to-br from-gray-50 via-white to-gray-50 dark:from-slate-950 dark:via-slate-900 dark:to-slate-950 text-gray-900 dark:text-slate-100 p-8 space-y-6">
+      <div className="flex flex-col gap-4 rounded-3xl border border-gray-200 dark:border-white/10 bg-white dark:bg-white/5 backdrop-blur-xl p-6 shadow-lg">
         <div className="flex flex-wrap items-center justify-between gap-4">
           <div>
-            <div className="inline-flex items-center gap-2 text-xs uppercase tracking-[0.3em] text-white/60">
-              <Sparkles className="w-4 h-4 text-fuchsia-300" /> Endless Copilot
+            <div className="inline-flex items-center gap-2 text-xs uppercase tracking-[0.3em] text-gray-600 dark:text-white/60">
+              <Sparkles className="w-4 h-4 text-fuchsia-500 dark:text-fuchsia-300" /> Endless Copilot
             </div>
-            <h1 className="text-3xl font-semibold mt-2 text-white">Modern AI finance console</h1>
-            <p className="text-sm text-white/70 mt-1">Ask anything about your ledgers, get perspective instantly.</p>
+            <h1 className="text-3xl font-semibold mt-2 text-gray-900 dark:text-white">Modern AI finance console</h1>
+            <p className="text-sm text-gray-700 dark:text-white/70 mt-1">Ask anything about your ledgers, get perspective instantly.</p>
           </div>
           <div className="flex gap-4 text-sm">
-            <div className="px-4 py-3 rounded-2xl border border-white/10 bg-white/5">
-              <p className="text-white/60 text-xs uppercase tracking-wide">Accounts</p>
-              <p className="text-2xl font-semibold">{insightMeta.accounts ?? '—'}</p>
+            <div className="px-4 py-3 rounded-2xl border border-gray-200 dark:border-white/10 bg-gray-50 dark:bg-white/5">
+              <p className="text-gray-600 dark:text-white/60 text-xs uppercase tracking-wide">Accounts</p>
+              <p className="text-2xl font-semibold text-gray-900 dark:text-white">{insightMeta.accounts ?? '—'}</p>
             </div>
-            <div className="px-4 py-3 rounded-2xl border border-white/10 bg-white/5">
-              <p className="text-white/60 text-xs uppercase tracking-wide">Journal Entries</p>
-              <p className="text-2xl font-semibold">{insightMeta.journals ?? '—'}</p>
+            <div className="px-4 py-3 rounded-2xl border border-gray-200 dark:border-white/10 bg-gray-50 dark:bg-white/5">
+              <p className="text-gray-600 dark:text-white/60 text-xs uppercase tracking-wide">Journal Entries</p>
+              <p className="text-2xl font-semibold text-gray-900 dark:text-white">{insightMeta.journals ?? '—'}</p>
             </div>
           </div>
         </div>
@@ -111,7 +111,7 @@ export default function AIConsolePage() {
             <button
               key={prompt}
               onClick={() => setQuery(prompt)}
-              className="px-4 py-2 text-sm rounded-full border border-white/10 bg-white/5 hover:bg-white/10 transition-colors"
+              className="px-4 py-2 text-sm rounded-full border border-gray-300 dark:border-white/10 bg-gray-50 dark:bg-white/5 hover:bg-gray-100 dark:hover:bg-white/10 transition-colors text-gray-700 dark:text-white"
             >
               {prompt}
             </button>
@@ -120,12 +120,12 @@ export default function AIConsolePage() {
       </div>
 
       <div className="grid lg:grid-cols-[2fr_1fr] gap-6">
-        <div className="rounded-3xl border border-white/10 bg-slate-900/70 backdrop-blur-xl overflow-hidden">
-          <div className="border-b border-white/10 p-5">
-            <label className="text-xs font-semibold uppercase tracking-widest text-white/60">Prompt Endless AI</label>
+        <div className="rounded-3xl border border-gray-200 dark:border-white/10 bg-white dark:bg-slate-900/70 backdrop-blur-xl overflow-hidden shadow-lg">
+          <div className="border-b border-gray-200 dark:border-white/10 p-5 bg-gray-50 dark:bg-transparent">
+            <label className="text-xs font-semibold uppercase tracking-widest text-gray-600 dark:text-white/60">Prompt Endless AI</label>
             <div className="mt-3 flex flex-col gap-3">
               <textarea
-                className="w-full bg-white/5 border border-white/10 rounded-2xl p-4 text-sm min-h-[110px] focus:outline-none focus:ring-2 focus:ring-fuchsia-500/60 placeholder:text-white/40"
+                className="w-full bg-white dark:bg-white/5 border border-gray-300 dark:border-white/10 rounded-2xl p-4 text-sm min-h-[110px] focus:outline-none focus:ring-2 focus:ring-fuchsia-500/60 placeholder:text-gray-400 dark:placeholder:text-white/40 text-gray-900 dark:text-white"
                 rows={3}
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
@@ -139,16 +139,16 @@ export default function AIConsolePage() {
                 disabled={companyBlocked}
               />
               {companyBlocked && (
-                <div className="text-xs text-amber-300 bg-amber-500/10 border border-amber-500/30 rounded-2xl px-4 py-2 inline-flex items-center gap-2">
+                <div className="text-xs text-amber-700 dark:text-amber-300 bg-amber-100 dark:bg-amber-500/10 border border-amber-300 dark:border-amber-500/30 rounded-2xl px-4 py-2 inline-flex items-center gap-2">
                   <Target className="w-4 h-4" /> Waiting for demo company to load. Seed data to begin.
                 </div>
               )}
               <div className="flex justify-between items-center">
-                <p className="text-xs text-white/40">Cmd/Ctrl + Enter to submit</p>
+                <p className="text-xs text-gray-500 dark:text-white/40">Cmd/Ctrl + Enter to submit</p>
                 <button
                   onClick={handleAsk}
                   disabled={loading || !query.trim() || companyBlocked}
-                  className="inline-flex items-center gap-2 px-5 py-2 rounded-full bg-gradient-to-r from-fuchsia-500 to-indigo-500 text-sm font-medium tracking-wide disabled:opacity-40 disabled:cursor-not-allowed shadow-[0_10px_35px_rgba(129,80,255,0.4)]"
+                  className="inline-flex items-center gap-2 px-5 py-2 rounded-full bg-gradient-to-r from-fuchsia-500 to-indigo-500 text-sm font-medium tracking-wide disabled:opacity-40 disabled:cursor-not-allowed shadow-[0_10px_35px_rgba(129,80,255,0.4)] text-white"
                 >
                   <Sparkles className="w-4 h-4" />
                   {loading ? "Thinking..." : "Generate insight"}
@@ -157,10 +157,10 @@ export default function AIConsolePage() {
             </div>
           </div>
 
-          <div className="h-[420px] overflow-y-auto p-5 space-y-4 custom-scrollbar">
+          <div className="h-[420px] overflow-y-auto p-5 space-y-4 custom-scrollbar bg-gray-50 dark:bg-transparent">
             {messages.length === 0 && (
-              <div className="flex flex-col items-center justify-center text-center text-white/60 h-full">
-                <LineChart className="w-12 h-12 text-fuchsia-300 mb-4" />
+              <div className="flex flex-col items-center justify-center text-center text-gray-600 dark:text-white/60 h-full">
+                <LineChart className="w-12 h-12 text-fuchsia-500 dark:text-fuchsia-300 mb-4" />
                 <p className="max-w-sm">
                   Ask about burn, runway, vendor spend, anomalies, or anything else. I'll blend ledger data with real-time benchmarks.
                 </p>
@@ -172,12 +172,12 @@ export default function AIConsolePage() {
                   className={`max-w-2xl rounded-3xl px-5 py-4 text-sm leading-relaxed shadow-xl ${
                     msg.role === 'user'
                       ? 'bg-gradient-to-r from-fuchsia-500/80 to-indigo-500/80 text-white'
-                      : 'bg-white/6 border border-white/10 text-slate-100'
+                      : 'bg-white dark:bg-white/6 border border-gray-200 dark:border-white/10 text-gray-900 dark:text-slate-100'
                   }`}
                 >
                   <div className="whitespace-pre-wrap">{msg.content}</div>
                   {msg.metadata && (
-                    <div className="text-xs mt-3 text-white/60">
+                    <div className={`text-xs mt-3 ${msg.role === 'user' ? 'text-white/80' : 'text-gray-600 dark:text-white/60'}`}>
                       Based on {msg.metadata.account_count?.toLocaleString() ?? '—'} accounts • {msg.metadata.journal_count?.toLocaleString() ?? '—'} journal entries
                     </div>
                   )}
@@ -186,7 +186,7 @@ export default function AIConsolePage() {
             ))}
             {loading && (
               <div className="flex justify-start">
-                <div className="bg-white/5 border border-white/10 rounded-2xl px-4 py-3 flex items-center gap-2 text-sm text-white/60">
+                <div className="bg-gray-100 dark:bg-white/5 border border-gray-300 dark:border-white/10 rounded-2xl px-4 py-3 flex items-center gap-2 text-sm text-gray-700 dark:text-white/60">
                   <Loader2 className="w-4 h-4 animate-spin" /> Crunching the numbers...
                 </div>
               </div>
@@ -195,24 +195,24 @@ export default function AIConsolePage() {
         </div>
 
         <div className="space-y-4">
-          <div className="rounded-3xl border border-white/10 bg-white/5 backdrop-blur-xl p-5">
+          <div className="rounded-3xl border border-gray-200 dark:border-white/10 bg-white dark:bg-white/5 backdrop-blur-xl p-5 shadow-lg">
             <div className="flex items-center gap-3 mb-4">
-              <Building className="w-5 h-5 text-fuchsia-300" />
+              <Building className="w-5 h-5 text-fuchsia-500 dark:text-fuchsia-300" />
               <div>
-                <p className="text-xs uppercase tracking-[0.3em] text-white/60">Company</p>
-                <p className="text-lg font-semibold text-white">{company?.name || 'Demo Company'}</p>
+                <p className="text-xs uppercase tracking-[0.3em] text-gray-600 dark:text-white/60">Company</p>
+                <p className="text-lg font-semibold text-gray-900 dark:text-white">{company?.name || 'Demo Company'}</p>
               </div>
             </div>
-            <p className="text-sm text-white/70">
+            <p className="text-sm text-gray-700 dark:text-white/70">
               Endless Copilot reads your Supabase data live. Every response blends your ledger with peer benchmarks so you always have context.
             </p>
           </div>
-          <div className="rounded-3xl border border-white/10 bg-gradient-to-br from-slate-900 to-slate-900/80 p-5 space-y-3">
-            <h3 className="text-sm font-semibold text-white/70 uppercase tracking-widest">Power tips</h3>
-            <ul className="space-y-2 text-sm text-white/80">
+          <div className="rounded-3xl border border-gray-200 dark:border-white/10 bg-gradient-to-br from-gray-50 to-white dark:from-slate-900 dark:to-slate-900/80 p-5 space-y-3 shadow-lg">
+            <h3 className="text-sm font-semibold text-gray-700 dark:text-white/70 uppercase tracking-widest">Power tips</h3>
+            <ul className="space-y-2 text-sm text-gray-800 dark:text-white/80">
               <li>Ask for summaries plus next actions.</li>
               <li>Reference specific accounts or vendors for precision.</li>
-              <li>Combine metrics: “Compare marketing spend to revenue growth.”</li>
+              <li>Combine metrics: "Compare marketing spend to revenue growth."</li>
               <li>Follow up—context is carried automatically.</li>
             </ul>
           </div>

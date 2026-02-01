@@ -2,19 +2,76 @@
 @tailwind components;
 @tailwind utilities;
 
+/* Neon accent colors - preserved in both themes */
 :root {
-  color-scheme: light dark;
+  --neon-fuchsia: #d946ef;
+  --neon-cyan: #22d3ee;
+  --neon-emerald: #34d399;
+  --neon-indigo: #818cf8;
+  --neon-purple: #a855f7;
+}
+
+/* Light mode (default) */
+:root,
+html.light,
+[data-theme="light"] {
+  color-scheme: light;
+  --bg-primary: #f8fafc;
+  --bg-secondary: #ffffff;
+  --bg-tertiary: #f1f5f9;
+  --bg-card: #ffffff;
+  --bg-muted: #e2e8f0;
+  --text-primary: #0f172a;
+  --text-secondary: #475569;
+  --text-muted: #64748b;
+  --border-color: #cbd5e1;
+  --glow-opacity: 0.12;
+}
+
+/* Dark mode */
+html.dark,
+[data-theme="dark"] {
+  color-scheme: dark;
+  --bg-primary: #020617;
+  --bg-secondary: #0f172a;
+  --bg-tertiary: #1e293b;
+  --bg-card: rgba(15, 23, 42, 0.8);
+  --bg-muted: #1e293b;
+  --text-primary: #f8fafc;
+  --text-secondary: #cbd5e1;
+  --text-muted: #94a3b8;
+  --border-color: rgba(255, 255, 255, 0.1);
+  --glow-opacity: 0.4;
 }
 
 @layer base {
   html, body {
-    @apply bg-bg text-gray-900 dark:bg-neutral-900 dark:text-gray-100;
+    background-color: var(--bg-primary);
+    color: var(--text-primary);
+    transition: background-color 0.3s ease, color 0.3s ease;
   }
 }
 
 @layer components {
+  /* Theme-aware card with preserved neon glow */
   .card {
-    @apply bg-bg-card dark:bg-neutral-900 border border-border/70 rounded-2xl shadow-card p-6 transition-all;
+    @apply rounded-2xl shadow-card p-6 transition-all;
+    background-color: var(--bg-card);
+    border: 1px solid var(--border-color);
+  }
+
+  .card-glow {
+    position: relative;
+    overflow: hidden;
+  }
+
+  .card-glow::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: radial-gradient(circle at 50% 0%, var(--neon-fuchsia), transparent 60%);
+    opacity: var(--glow-opacity);
+    pointer-events: none;
   }
 
   .kpi {
@@ -22,7 +79,13 @@
   }
 
   .btn {
-    @apply inline-flex items-center justify-center rounded-lg border border-border/70 px-4 py-2 text-sm font-medium hover:bg-bg-muted/60 transition-all duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-400 focus-visible:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed;
+    @apply inline-flex items-center justify-center rounded-lg px-4 py-2 text-sm font-medium transition-all duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-400 focus-visible:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed;
+    border: 1px solid var(--border-color);
+    color: var(--text-primary);
+  }
+
+  .btn:hover {
+    background-color: var(--bg-muted);
   }
 
   .btn-primary {
@@ -30,15 +93,41 @@
   }
 
   .btn-secondary {
-    @apply btn bg-white dark:bg-neutral-800 hover:bg-gray-50 dark:hover:bg-neutral-700;
+    @apply btn;
+    background-color: var(--bg-secondary);
+  }
+
+  .btn-secondary:hover {
+    background-color: var(--bg-tertiary);
+  }
+
+  /* Neon accent button */
+  .btn-neon {
+    @apply btn text-white;
+    background: linear-gradient(135deg, var(--neon-fuchsia), var(--neon-indigo));
+    border: none;
+    box-shadow: 0 0 20px color-mix(in srgb, var(--neon-fuchsia) 50%, transparent);
+  }
+
+  .btn-neon:hover {
+    box-shadow: 0 0 30px color-mix(in srgb, var(--neon-fuchsia) 70%, transparent);
+    transform: translateY(-1px);
   }
 
   .input {
-    @apply w-full rounded-lg border border-border/70 bg-white dark:bg-neutral-900 px-3 py-2.5 text-sm placeholder:text-gray-400 dark:placeholder:text-gray-500 focus:outline-none focus:ring-2 focus:ring-brand-400 focus:border-transparent transition-all duration-200;
+    @apply w-full rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-brand-400 focus:border-transparent transition-all duration-200;
+    background-color: var(--bg-secondary);
+    border: 1px solid var(--border-color);
+    color: var(--text-primary);
+  }
+
+  .input::placeholder {
+    color: var(--text-muted);
   }
 
   .label {
-    @apply block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5;
+    @apply block text-sm font-medium mb-1.5;
+    color: var(--text-secondary);
   }
 
   .table {
@@ -46,11 +135,18 @@
   }
 
   .table thead th {
-    @apply text-left font-semibold text-gray-500 dark:text-gray-400 border-b border-border pb-3 px-4;
+    @apply text-left font-semibold pb-3 px-4;
+    color: var(--text-muted);
+    border-bottom: 1px solid var(--border-color);
   }
 
   .table tbody tr {
-    @apply border-b border-border/50 hover:bg-bg-muted/60 transition-colors duration-150;
+    border-bottom: 1px solid var(--border-color);
+    transition: background-color 150ms;
+  }
+
+  .table tbody tr:hover {
+    background-color: var(--bg-muted);
   }
 
   .table tbody td {
@@ -58,17 +154,54 @@
   }
 
   @keyframes shimmer {
-    0% {
-      background-position: -200% 0;
-    }
-    100% {
-      background-position: 200% 0;
-    }
+    0% { background-position: -200% 0; }
+    100% { background-position: 200% 0; }
   }
 
   .skeleton {
-    @apply animate-pulse rounded-lg bg-gradient-to-r from-gray-200 via-gray-100 to-gray-200 dark:from-neutral-800 dark:via-neutral-700 dark:to-neutral-800;
+    @apply animate-pulse rounded-lg;
+    background: linear-gradient(90deg, var(--bg-muted), var(--bg-tertiary), var(--bg-muted));
     background-size: 200% 100%;
     animation: shimmer 1.5s infinite;
+  }
+
+  /* Neon text accents - preserved in both themes */
+  .text-neon-fuchsia { color: var(--neon-fuchsia); }
+  .text-neon-cyan { color: var(--neon-cyan); }
+  .text-neon-emerald { color: var(--neon-emerald); }
+  .text-neon-indigo { color: var(--neon-indigo); }
+  .text-neon-purple { color: var(--neon-purple); }
+
+  /* Neon glow effects */
+  .glow-fuchsia {
+    text-shadow: 0 0 20px var(--neon-fuchsia);
+  }
+
+  .glow-cyan {
+    text-shadow: 0 0 20px var(--neon-cyan);
+  }
+
+  .glow-emerald {
+    text-shadow: 0 0 20px var(--neon-emerald);
+  }
+
+  /* Theme-aware surfaces */
+  .surface {
+    background-color: var(--bg-secondary);
+    border: 1px solid var(--border-color);
+  }
+
+  .surface-elevated {
+    background-color: var(--bg-card);
+    border: 1px solid var(--border-color);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+  }
+
+  /* Gradient text that works in both themes */
+  .text-gradient-neon {
+    background: linear-gradient(135deg, var(--neon-fuchsia), var(--neon-cyan));
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
   }
 }

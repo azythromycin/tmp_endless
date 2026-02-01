@@ -1,13 +1,18 @@
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Depends
 from database import supabase
 from datetime import datetime, timedelta
 from collections import defaultdict
+from typing import Dict
+from middleware.auth import get_current_user_company
 
 router = APIRouter()
 
 @router.get("/stats/{company_id}")
-def get_dashboard_stats(company_id: str):
+def get_dashboard_stats(company_id: str, auth: Dict[str, str] = Depends(get_current_user_company)):
     """Get dashboard statistics for a company"""
+    # Verify user owns this company
+    if auth["company_id"] != company_id:
+        raise HTTPException(status_code=403, detail="Cannot access another company's dashboard")
 
     # Get all accounts with their current balances
     accounts_response = supabase.table("accounts")\
@@ -27,7 +32,7 @@ def get_dashboard_stats(company_id: str):
     }
 
     for account in accounts:
-        acc_type = account.get("account_type", "")
+        acc_type = account.get("type", "")  # Database field is "type" not "account_type"
         balance = account.get("current_balance", 0) or 0
         if acc_type in totals:
             totals[acc_type] += balance
@@ -73,7 +78,7 @@ def get_monthly_trend(company_id: str, months: int = 6):
     start_date = (datetime.now() - timedelta(days=months * 30)).strftime("%Y-%m-%d")
 
     journal_entries_response = supabase.table("journal_entries")\
-        .select("id, entry_date, journal_lines(debit, credit, accounts(account_type))")\
+        .select("id, entry_date, journal_lines(debit, credit, accounts(type))")\
         .eq("company_id", company_id)\
         .gte("entry_date", start_date)\
         .execute()
@@ -86,7 +91,7 @@ def get_monthly_trend(company_id: str, months: int = 6):
         month_key = entry_date.strftime("%b")
 
         for line in entry.get("journal_lines", []):
-            account_type = line.get("accounts", {}).get("account_type", "")
+            account_type = line.get("accounts", {}).get("type", "")  # Database field is "type"
             credit = line.get("credit", 0) or 0
             debit = line.get("debit", 0) or 0
 
@@ -119,7 +124,7 @@ def get_category_breakdown(company_id: str):
     accounts_response = supabase.table("accounts")\
         .select("account_name, current_balance")\
         .eq("company_id", company_id)\
-        .eq("account_type", "expense")\
+        .eq("type", "expense")  # Database field is "type" not "account_type"
         .gt("current_balance", 0)\
         .execute()
 

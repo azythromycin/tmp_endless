@@ -130,20 +130,20 @@ export default function Profile() {
       .join('') || 'EN'
   }, [personalInfo.fullName, companyInfo.name])
 
-  const inputStyles = 'mt-2 w-full rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-sm text-white placeholder:text-white/40 focus:outline-none focus:ring-2 focus:ring-fuchsia-500/40'
-  const labelStyles = 'text-xs uppercase tracking-[0.35em] text-white/50'
+  const inputStyles = 'mt-2 w-full rounded-2xl border border-gray-300 dark:border-white/10 bg-white dark:bg-white/5 px-4 py-3 text-sm text-gray-900 dark:text-white placeholder:text-gray-400 dark:placeholder:text-white/40 focus:outline-none focus:ring-2 focus:ring-fuchsia-500/40'
+  const labelStyles = 'text-xs uppercase tracking-[0.35em] text-gray-600 dark:text-white/50'
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950 text-white p-8 space-y-6">
+    <div className="min-h-screen bg-gradient-to-br from-gray-50 via-white to-gray-50 dark:from-slate-950 dark:via-slate-900 dark:to-slate-950 text-gray-900 dark:text-white p-8 space-y-6">
       <div className="flex flex-wrap items-center justify-between gap-4">
         <div>
-          <p className="text-xs uppercase tracking-[0.4em] text-white/60">Control Center</p>
-          <h1 className="text-3xl font-semibold mt-2">Profile & Company Settings</h1>
-          <p className="text-white/60 mt-1">Keep your identity and firm metadata in sync with Endless Copilot.</p>
+          <p className="text-xs uppercase tracking-[0.4em] text-gray-600 dark:text-white/60">Control Center</p>
+          <h1 className="text-3xl font-semibold mt-2 text-gray-900 dark:text-white">Profile & Company Settings</h1>
+          <p className="text-gray-600 dark:text-white/60 mt-1">Keep your identity and firm metadata in sync with Endless Copilot.</p>
         </div>
         <button
           onClick={handleLogout}
-          className="inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/5 px-4 py-2 text-sm text-white/80 transition hover:text-white"
+          className="inline-flex items-center gap-2 rounded-full border border-gray-300 dark:border-white/15 bg-white dark:bg-white/5 px-4 py-2 text-sm text-gray-700 dark:text-white/80 transition hover:text-gray-900 dark:hover:text-white"
         >
           <LogOut className="w-4 h-4" />
           Log out
@@ -151,54 +151,54 @@ export default function Profile() {
       </div>
 
       <div className="grid lg:grid-cols-2 gap-4">
-        <div className="rounded-3xl border border-white/10 bg-white/5 backdrop-blur-xl p-6 space-y-4">
+        <div className="rounded-3xl border border-gray-200 dark:border-white/10 bg-white dark:bg-white/5 backdrop-blur-xl p-6 space-y-4 shadow-lg">
           <div className="flex items-center gap-4">
-            <div className="h-16 w-16 rounded-2xl bg-gradient-to-r from-fuchsia-500 to-indigo-500 flex items-center justify-center text-xl font-semibold">
+            <div className="h-16 w-16 rounded-2xl bg-gradient-to-r from-fuchsia-500 to-indigo-500 flex items-center justify-center text-xl font-semibold text-white">
               {initials}
             </div>
             <div>
-              <p className="text-sm text-white/60 uppercase tracking-[0.3em]">Identity</p>
-              <h3 className="text-2xl font-semibold">{personalInfo.fullName || 'Demo User'}</h3>
-              <p className="text-white/60 text-sm">{personalInfo.email || 'demo@endless.finance'}</p>
+              <p className="text-sm text-gray-600 dark:text-white/60 uppercase tracking-[0.3em]">Identity</p>
+              <h3 className="text-2xl font-semibold text-gray-900 dark:text-white">{personalInfo.fullName || 'Demo User'}</h3>
+              <p className="text-gray-600 dark:text-white/60 text-sm">{personalInfo.email || 'demo@endless.finance'}</p>
             </div>
           </div>
-          <div className="grid grid-cols-2 gap-3 text-sm text-white/70">
-            <div className="rounded-2xl border border-white/10 bg-white/5 p-3 flex items-center gap-2">
-              <Mail className="w-4 h-4 text-fuchsia-300" />
+          <div className="grid grid-cols-2 gap-3 text-sm text-gray-700 dark:text-white/70">
+            <div className="rounded-2xl border border-gray-200 dark:border-white/10 bg-gray-50 dark:bg-white/5 p-3 flex items-center gap-2">
+              <Mail className="w-4 h-4 text-fuchsia-500 dark:text-fuchsia-300" />
               {personalInfo.role || 'Admin'}
             </div>
-            <div className="rounded-2xl border border-white/10 bg-white/5 p-3 flex items-center gap-2">
-              <Calendar className="w-4 h-4 text-cyan-300" />
+            <div className="rounded-2xl border border-gray-200 dark:border-white/10 bg-gray-50 dark:bg-white/5 p-3 flex items-center gap-2">
+              <Calendar className="w-4 h-4 text-cyan-500 dark:text-cyan-300" />
               Joined Endless
             </div>
           </div>
         </div>
 
-        <div className="rounded-3xl border border-white/10 bg-white/5 backdrop-blur-xl p-6 space-y-4">
+        <div className="rounded-3xl border border-gray-200 dark:border-white/10 bg-white dark:bg-white/5 backdrop-blur-xl p-6 space-y-4 shadow-lg">
           <div className="flex items-center gap-4">
-            <div className="h-16 w-16 rounded-2xl border border-white/20 bg-white/5 flex items-center justify-center">
-              <Building2 className="w-6 h-6 text-fuchsia-200" />
+            <div className="h-16 w-16 rounded-2xl border border-gray-300 dark:border-white/20 bg-gray-50 dark:bg-white/5 flex items-center justify-center">
+              <Building2 className="w-6 h-6 text-fuchsia-500 dark:text-fuchsia-200" />
             </div>
             <div>
-              <p className="text-sm text-white/60 uppercase tracking-[0.3em]">Company</p>
-              <h3 className="text-2xl font-semibold">{companyInfo.name || 'Demo Company'}</h3>
-              <p className="text-white/60 text-sm">{companyInfo.industry || 'Technology'}</p>
+              <p className="text-sm text-gray-600 dark:text-white/60 uppercase tracking-[0.3em]">Company</p>
+              <h3 className="text-2xl font-semibold text-gray-900 dark:text-white">{companyInfo.name || 'Demo Company'}</h3>
+              <p className="text-gray-600 dark:text-white/60 text-sm">{companyInfo.industry || 'Technology'}</p>
             </div>
           </div>
-          <div className="grid grid-cols-2 gap-3 text-sm text-white/70">
-            <div className="rounded-2xl border border-white/10 bg-white/5 p-3 flex items-center gap-2">
-              <Phone className="w-4 h-4 text-emerald-300" />
+          <div className="grid grid-cols-2 gap-3 text-sm text-gray-700 dark:text-white/70">
+            <div className="rounded-2xl border border-gray-200 dark:border-white/10 bg-gray-50 dark:bg-white/5 p-3 flex items-center gap-2">
+              <Phone className="w-4 h-4 text-emerald-500 dark:text-emerald-300" />
               {companyInfo.phone || '—'}
             </div>
-            <div className="rounded-2xl border border-white/10 bg-white/5 p-3 flex items-center gap-2">
-              <MapPin className="w-4 h-4 text-sky-300" />
+            <div className="rounded-2xl border border-gray-200 dark:border-white/10 bg-gray-50 dark:bg-white/5 p-3 flex items-center gap-2">
+              <MapPin className="w-4 h-4 text-sky-500 dark:text-sky-300" />
               {companyInfo.city ? `${companyInfo.city}, ${companyInfo.state}` : 'Unknown HQ'}
             </div>
           </div>
         </div>
       </div>
 
-      <div className="flex gap-3 border-b border-white/10 pb-1">
+      <div className="flex gap-3 border-b border-gray-200 dark:border-white/10 pb-1">
         {[
           { key: 'personal', label: 'Personal Identity', icon: User },
           { key: 'company', label: 'Company Metadata', icon: Building2 }
@@ -209,7 +209,7 @@ export default function Profile() {
             className={`flex items-center gap-2 rounded-full px-4 py-2 text-sm font-semibold transition ${
               activeTab === tab.key
                 ? 'bg-gradient-to-r from-fuchsia-500/50 to-cyan-500/50 text-white shadow-[0_10px_40px_rgba(147,51,234,0.35)]'
-                : 'text-white/60 hover:text-white'
+                : 'text-gray-600 dark:text-white/60 hover:text-gray-900 dark:hover:text-white'
             }`}
           >
             <tab.icon className="w-4 h-4" />
@@ -219,13 +219,13 @@ export default function Profile() {
       </div>
 
       {activeTab === 'personal' && (
-        <div className="rounded-3xl border border-white/10 bg-white/5 backdrop-blur-xl p-6 space-y-8">
-          <div className="flex flex-wrap items-center justify-between gap-4 border-b border-white/10 pb-6">
+        <div className="rounded-3xl border border-gray-200 dark:border-white/10 bg-white dark:bg-white/5 backdrop-blur-xl p-6 space-y-8 shadow-lg">
+          <div className="flex flex-wrap items-center justify-between gap-4 border-b border-gray-200 dark:border-white/10 pb-6">
             <div>
-              <p className="text-xs uppercase tracking-[0.4em] text-white/50">Profile photo</p>
-              <h3 className="text-lg font-semibold text-white mt-1">Update your avatar</h3>
+              <p className="text-xs uppercase tracking-[0.4em] text-gray-600 dark:text-white/50">Profile photo</p>
+              <h3 className="text-lg font-semibold text-gray-900 dark:text-white mt-1">Update your avatar</h3>
             </div>
-            <button className="inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/5 px-4 py-2 text-sm text-white/80">
+            <button className="inline-flex items-center gap-2 rounded-full border border-gray-300 dark:border-white/15 bg-gray-50 dark:bg-white/5 px-4 py-2 text-sm text-gray-700 dark:text-white/80">
               <Upload className="w-4 h-4" />
               Upload photo
             </button>
@@ -265,7 +265,7 @@ export default function Profile() {
               <select
                 value={personalInfo.role}
                 onChange={(e) => setPersonalInfo({ ...personalInfo, role: e.target.value })}
-                className={`${inputStyles} bg-slate-950/40`}
+                className={`${inputStyles} bg-gray-50 dark:bg-slate-950/40`}
               >
                 <option value="Admin">Admin</option>
                 <option value="Accountant">Accountant</option>
@@ -275,14 +275,14 @@ export default function Profile() {
             </div>
           </div>
 
-          <div className="flex flex-wrap justify-end gap-3 border-t border-white/10 pt-6">
-            <button className="rounded-full border border-white/15 px-5 py-2 text-sm text-white/70 hover:text-white">
+          <div className="flex flex-wrap justify-end gap-3 border-t border-gray-200 dark:border-white/10 pt-6">
+            <button className="rounded-full border border-gray-300 dark:border-white/15 px-5 py-2 text-sm text-gray-700 dark:text-white/70 hover:text-gray-900 dark:hover:text-white">
               Cancel
             </button>
             <button
               onClick={handlePersonalSave}
               disabled={loading}
-              className="inline-flex items-center gap-2 rounded-full bg-gradient-to-r from-fuchsia-500 to-indigo-500 px-5 py-2 text-sm font-semibold shadow-[0_15px_45px_rgba(129,80,255,0.45)] disabled:opacity-40"
+              className="inline-flex items-center gap-2 rounded-full bg-gradient-to-r from-fuchsia-500 to-indigo-500 px-5 py-2 text-sm font-semibold shadow-[0_15px_45px_rgba(129,80,255,0.45)] disabled:opacity-40 text-white"
             >
               <Save className="w-4 h-4" />
               Save changes
@@ -292,13 +292,13 @@ export default function Profile() {
       )}
 
       {activeTab === 'company' && (
-        <div className="rounded-3xl border border-white/10 bg-white/5 backdrop-blur-xl p-6 space-y-8">
-          <div className="flex flex-wrap items-center justify-between gap-4 border-b border-white/10 pb-6">
+        <div className="rounded-3xl border border-gray-200 dark:border-white/10 bg-white dark:bg-white/5 backdrop-blur-xl p-6 space-y-8 shadow-lg">
+          <div className="flex flex-wrap items-center justify-between gap-4 border-b border-gray-200 dark:border-white/10 pb-6">
             <div>
-              <p className="text-xs uppercase tracking-[0.4em] text-white/50">Logo</p>
-              <h3 className="text-lg font-semibold text-white mt-1">Refresh brand identity</h3>
+              <p className="text-xs uppercase tracking-[0.4em] text-gray-600 dark:text-white/50">Logo</p>
+              <h3 className="text-lg font-semibold text-gray-900 dark:text-white mt-1">Refresh brand identity</h3>
             </div>
-            <button className="inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/5 px-4 py-2 text-sm text-white/80">
+            <button className="inline-flex items-center gap-2 rounded-full border border-gray-300 dark:border-white/15 bg-gray-50 dark:bg-white/5 px-4 py-2 text-sm text-gray-700 dark:text-white/80">
               <Upload className="w-4 h-4" />
               Upload logo
             </button>
@@ -319,7 +319,7 @@ export default function Profile() {
               <select
                 value={companyInfo.industry}
                 onChange={(e) => setCompanyInfo({ ...companyInfo, industry: e.target.value })}
-                className={`${inputStyles} bg-slate-950/40`}
+                className={`${inputStyles} bg-gray-50 dark:bg-slate-950/40`}
               >
                 <option value="Technology">Technology</option>
                 <option value="Retail">Retail</option>
@@ -414,14 +414,14 @@ export default function Profile() {
             </div>
           </div>
 
-          <div className="flex flex-wrap justify-end gap-3 border-t border-white/10 pt-6">
-            <button className="rounded-full border border-white/15 px-5 py-2 text-sm text-white/70 hover:text-white">
+          <div className="flex flex-wrap justify-end gap-3 border-t border-gray-200 dark:border-white/10 pt-6">
+            <button className="rounded-full border border-gray-300 dark:border-white/15 px-5 py-2 text-sm text-gray-700 dark:text-white/70 hover:text-gray-900 dark:hover:text-white">
               Cancel
             </button>
             <button
               onClick={handleCompanySave}
               disabled={loading}
-              className="inline-flex items-center gap-2 rounded-full bg-gradient-to-r from-fuchsia-500 to-indigo-500 px-5 py-2 text-sm font-semibold shadow-[0_15px_45px_rgba(129,80,255,0.45)] disabled:opacity-40"
+              className="inline-flex items-center gap-2 rounded-full bg-gradient-to-r from-fuchsia-500 to-indigo-500 px-5 py-2 text-sm font-semibold shadow-[0_15px_45px_rgba(129,80,255,0.45)] disabled:opacity-40 text-white"
             >
               <Save className="w-4 h-4" />
               Save changes
@@ -430,18 +430,18 @@ export default function Profile() {
         </div>
       )}
 
-      <div className="rounded-3xl border border-rose-500/30 bg-rose-500/10 p-6 space-y-4">
+      <div className="rounded-3xl border border-rose-400/50 dark:border-rose-500/30 bg-rose-50 dark:bg-rose-500/10 p-6 space-y-4 shadow-lg">
         <div className="flex items-center gap-3">
-          <AlertCircle className="w-5 h-5 text-rose-300" />
+          <AlertCircle className="w-5 h-5 text-rose-600 dark:text-rose-300" />
           <div>
-            <p className="text-sm uppercase tracking-[0.4em] text-rose-300">Danger zone</p>
-            <h3 className="text-lg font-semibold text-white mt-1">Delete account</h3>
+            <p className="text-sm uppercase tracking-[0.4em] text-rose-600 dark:text-rose-300">Danger zone</p>
+            <h3 className="text-lg font-semibold text-gray-900 dark:text-white mt-1">Delete account</h3>
           </div>
         </div>
-        <p className="text-sm text-white/70">
+        <p className="text-sm text-gray-700 dark:text-white/70">
           Permanently remove this user and company data from Endless Copilot. This cannot be undone once confirmed.
         </p>
-        <button className="rounded-full bg-gradient-to-r from-rose-500 to-red-500 px-5 py-2 text-sm font-semibold shadow-[0_15px_45px_rgba(225,29,72,0.4)]">
+        <button className="rounded-full bg-gradient-to-r from-rose-500 to-red-500 px-5 py-2 text-sm font-semibold shadow-[0_15px_45px_rgba(225,29,72,0.4)] text-white">
           Delete account
         </button>
       </div>

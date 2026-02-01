@@ -1,7 +1,7 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from database import table
-from routes import users, companies, expenses, parser, ai_overlook, accounts, journals, dashboard, ai_insights
+from routes import users, companies, expenses, parser, ai_overlook, accounts, journals, dashboard, ai_insights, ai_research
 
 app = FastAPI(title="AI Financial Companion Backend")
 
@@ -21,6 +21,7 @@ app.include_router(accounts.router, prefix="/accounts", tags=["accounts"])
 app.include_router(journals.router, prefix="/journals", tags=["journals"])
 app.include_router(dashboard.router, prefix="/dashboard", tags=["dashboard"])
 app.include_router(ai_insights.router, prefix="/ai-insights", tags=["ai-insights"])
+app.include_router(ai_research.router)  # Already has /ai/research prefix
 app.include_router(expenses.router)
 app.include_router(parser.router)
 app.include_router(ai_overlook.router)

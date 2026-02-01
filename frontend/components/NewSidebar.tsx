@@ -16,6 +16,7 @@ import {
 import { useMemo } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
 import { useAuth } from '@/contexts/AuthContext'
+import { useTheme } from '@/contexts/ThemeContext'
 
 interface SidebarProps {
   collapsed: boolean
@@ -34,6 +35,9 @@ const navigation = [
 export default function NewSidebar({ collapsed, onToggle }: SidebarProps) {
   const pathname = usePathname()
   const { user, company } = useAuth()
+  const { theme } = useTheme()
+  const isDark = theme === 'dark'
+
   const initials = useMemo(() => {
     const source = user?.full_name || company?.name || 'Endless'
     return (
@@ -51,13 +55,34 @@ export default function NewSidebar({ collapsed, onToggle }: SidebarProps) {
       initial={false}
       animate={{ width: collapsed ? 96 : 280 }}
       transition={{ type: 'spring', stiffness: 200, damping: 26 }}
-      className="fixed left-0 top-0 z-40 flex h-screen flex-col border-r border-white/10 bg-gradient-to-b from-slate-950 via-slate-900 to-slate-950 text-white shadow-[0_20px_120px_rgba(15,23,42,0.7)]"
+      className="fixed left-0 top-0 z-40 flex h-screen flex-col transition-colors duration-300"
+      style={{
+        backgroundColor: 'var(--bg-secondary)',
+        borderRight: '1px solid var(--border-color)',
+        color: 'var(--text-primary)',
+        boxShadow: isDark
+          ? '0 20px 120px rgba(15,23,42,0.7)'
+          : '0 20px 60px rgba(0,0,0,0.08)'
+      }}
     >
       <div className="relative flex h-20 items-center justify-between px-4">
-        <div className="absolute inset-0 bg-gradient-to-r from-fuchsia-500/20 via-cyan-400/10 to-transparent blur-3xl" />
+        <div
+          className="absolute inset-0 blur-3xl"
+          style={{
+            background: 'linear-gradient(to right, var(--neon-fuchsia), var(--neon-cyan), transparent)',
+            opacity: 'var(--glow-opacity)'
+          }}
+        />
         <div className="relative flex items-center gap-3">
-          <div className="flex h-11 w-11 items-center justify-center rounded-2xl border border-white/20 bg-white/5 text-white shadow-[0_10px_40px_rgba(129,80,255,0.4)]">
-            <Building2 className="h-5 w-5 text-fuchsia-200" />
+          <div
+            className="flex h-11 w-11 items-center justify-center rounded-2xl"
+            style={{
+              border: '1px solid var(--border-color)',
+              backgroundColor: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.03)',
+              boxShadow: '0 10px 40px rgba(217,70,239,0.3)'
+            }}
+          >
+            <Building2 className="h-5 w-5" style={{ color: 'var(--neon-fuchsia)' }} />
           </div>
           <AnimatePresence>
             {!collapsed && (
@@ -67,15 +92,24 @@ export default function NewSidebar({ collapsed, onToggle }: SidebarProps) {
                 exit={{ opacity: 0, x: -8 }}
                 className="leading-tight"
               >
-                <p className="text-[11px] uppercase tracking-[0.5em] text-white/60">Endless</p>
-                <p className="text-lg font-semibold text-white">Finance OS</p>
+                <p className="text-[11px] uppercase tracking-[0.5em]" style={{ color: 'var(--text-muted)' }}>
+                  Endless
+                </p>
+                <p className="text-lg font-semibold" style={{ color: 'var(--text-primary)' }}>
+                  Finance OS
+                </p>
               </motion.div>
             )}
           </AnimatePresence>
         </div>
         <button
           onClick={onToggle}
-          className="relative flex h-10 w-10 items-center justify-center rounded-2xl border border-white/15 bg-white/5 text-white/60 transition hover:text-white"
+          className="relative flex h-10 w-10 items-center justify-center rounded-2xl transition"
+          style={{
+            border: '1px solid var(--border-color)',
+            backgroundColor: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.03)',
+            color: 'var(--text-muted)'
+          }}
           aria-label={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
         >
           {collapsed ? <Menu className="h-4 w-4" /> : <PanelRight className="h-4 w-4" />}
@@ -91,14 +125,22 @@ export default function NewSidebar({ collapsed, onToggle }: SidebarProps) {
               href={item.href}
               className={`group relative flex items-center gap-3 rounded-2xl px-4 py-3 text-sm font-medium transition-all ${
                 collapsed ? 'justify-center' : ''
-              } ${isActive ? 'text-white' : 'text-white/60 hover:text-white'}`}
+              }`}
+              style={{
+                color: isActive ? 'var(--text-primary)' : 'var(--text-muted)'
+              }}
             >
               <span
-                className={`flex h-10 w-10 items-center justify-center rounded-xl border ${
-                  isActive
-                    ? 'border-fuchsia-400/60 bg-gradient-to-br from-fuchsia-500/40 to-cyan-500/40 text-white'
-                    : 'border-white/10 bg-white/5 text-white/70 group-hover:border-fuchsia-400/30'
-                }`}
+                className="flex h-10 w-10 items-center justify-center rounded-xl transition-all"
+                style={{
+                  border: isActive
+                    ? '1px solid rgba(217,70,239,0.6)'
+                    : '1px solid var(--border-color)',
+                  background: isActive
+                    ? 'linear-gradient(135deg, rgba(217,70,239,0.4), rgba(34,211,238,0.4))'
+                    : isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.03)',
+                  color: isActive ? 'var(--text-primary)' : 'var(--text-muted)'
+                }}
               >
                 <item.icon className="h-4 w-4" />
               </span>
@@ -115,7 +157,13 @@ export default function NewSidebar({ collapsed, onToggle }: SidebarProps) {
                 )}
               </AnimatePresence>
               {isActive && !collapsed && (
-                <span className="h-1.5 w-1.5 rounded-full bg-fuchsia-400 shadow-[0_0_12px_rgba(244,114,182,0.8)]" />
+                <span
+                  className="h-1.5 w-1.5 rounded-full"
+                  style={{
+                    backgroundColor: 'var(--neon-fuchsia)',
+                    boxShadow: '0 0 12px var(--neon-fuchsia)'
+                  }}
+                />
               )}
             </Link>
           )
@@ -123,9 +171,20 @@ export default function NewSidebar({ collapsed, onToggle }: SidebarProps) {
       </nav>
 
       <div className="px-3 pb-6">
-        <div className="rounded-3xl border border-white/10 bg-gradient-to-r from-slate-900/80 to-slate-900/30 p-4">
+        <div
+          className="rounded-3xl p-4"
+          style={{
+            border: '1px solid var(--border-color)',
+            backgroundColor: isDark ? 'rgba(15,23,42,0.5)' : 'rgba(0,0,0,0.02)'
+          }}
+        >
           <div className="flex items-center gap-3">
-            <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-gradient-to-r from-fuchsia-500 to-indigo-500 text-sm font-semibold">
+            <div
+              className="flex h-11 w-11 items-center justify-center rounded-2xl text-sm font-semibold text-white"
+              style={{
+                background: 'linear-gradient(135deg, var(--neon-fuchsia), var(--neon-indigo))'
+              }}
+            >
               {initials}
             </div>
             <AnimatePresence>
@@ -136,14 +195,20 @@ export default function NewSidebar({ collapsed, onToggle }: SidebarProps) {
                   exit={{ opacity: 0, x: -6 }}
                   className="min-w-0"
                 >
-                  <p className="truncate text-sm font-semibold text-white">{company?.name || 'Demo Company'}</p>
-                  <p className="truncate text-xs text-white/60">{user?.email || 'demo@endless.finance'}</p>
+                  <p className="truncate text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>
+                    {company?.name || 'Demo Company'}
+                  </p>
+                  <p className="truncate text-xs" style={{ color: 'var(--text-muted)' }}>
+                    {user?.email || 'demo@endless.finance'}
+                  </p>
                 </motion.div>
               )}
             </AnimatePresence>
           </div>
           {!collapsed && (
-            <p className="mt-3 text-xs text-white/40">Realtime ledgers synced to Endless Copilot.</p>
+            <p className="mt-3 text-xs" style={{ color: 'var(--text-muted)' }}>
+              Realtime ledgers synced to Endless Copilot.
+            </p>
           )}
         </div>
       </div>

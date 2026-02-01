@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { Building2, Mail, Lock, User, Eye, EyeOff } from 'lucide-react'
+import { Building2, Mail, Lock, User, Eye, EyeOff, CheckCircle } from 'lucide-react'
 import Link from 'next/link'
 import { useAuth } from '@/contexts/AuthContext'
 
@@ -16,6 +16,7 @@ export default function Signup() {
   })
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
+  const [success, setSuccess] = useState(false)
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -35,6 +36,7 @@ export default function Signup() {
 
     try {
       await signUp(formData.email, formData.password, formData.fullName)
+      setSuccess(true)
     } catch (error: any) {
       console.error('Signup failed:', error)
       setError(error.message || 'Signup failed. Please try again.')
@@ -63,6 +65,20 @@ export default function Signup() {
           {error && (
             <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg text-red-700 text-sm">
               {error}
+            </div>
+          )}
+          {success && (
+            <div className="mb-4 p-4 bg-emerald-50 border border-emerald-200 rounded-lg">
+              <div className="flex items-start gap-3">
+                <CheckCircle className="w-5 h-5 text-emerald-600 flex-shrink-0 mt-0.5" />
+                <div>
+                  <p className="text-emerald-900 font-medium mb-1">Check your email!</p>
+                  <p className="text-emerald-700 text-sm">
+                    We've sent a confirmation link to <strong>{formData.email}</strong>.
+                    Click the link to verify your account and you'll be redirected to login.
+                  </p>
+                </div>
+              </div>
             </div>
           )}
           <form onSubmit={handleSubmit} className="space-y-5">

@@ -46,7 +46,7 @@ export default function JournalsPage() {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center h-64">
+      <div className="min-h-screen bg-gradient-to-br from-gray-50 via-white to-gray-50 dark:from-slate-950 dark:via-slate-900 dark:to-slate-950 flex items-center justify-center">
         <div className="flex items-center gap-2 text-gray-500 dark:text-gray-400">
           <svg className="animate-spin h-5 w-5" fill="none" viewBox="0 0 24 24">
             <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
@@ -59,7 +59,7 @@ export default function JournalsPage() {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="min-h-screen bg-gradient-to-br from-gray-50 via-white to-gray-50 dark:from-slate-950 dark:via-slate-900 dark:to-slate-950 p-8 space-y-6">
       <div className="card">
         <div className="flex items-center justify-between mb-5">
           <div>
@@ -93,7 +93,7 @@ export default function JournalsPage() {
         ) : (
           <div className="space-y-4">
             {journals.map((journal) => (
-              <div key={journal.id} className="border dark:border-neutral-700 rounded-lg p-4 space-y-3">
+              <div key={journal.id} className="border border-gray-200 dark:border-neutral-700 rounded-lg p-4 space-y-3">
                 <div className="flex justify-between items-start">
                   <div>
                     <div className="font-semibold text-gray-900 dark:text-white">{journal.journal_number}</div>
@@ -110,7 +110,7 @@ export default function JournalsPage() {
                   </div>
                 </div>
                 {journal.journal_lines && journal.journal_lines.length > 0 && (
-                  <div className="border-t dark:border-neutral-700 pt-3 space-y-2">
+                  <div className="border-t border-gray-200 dark:border-neutral-700 pt-3 space-y-2">
                     <div className="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Lines</div>
                     {journal.journal_lines.map((line: any, idx: number) => (
                       <div key={idx} className="flex justify-between text-sm pl-4">

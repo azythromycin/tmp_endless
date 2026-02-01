@@ -166,27 +166,27 @@ export default function ChartOfAccounts() {
 
   if (!companyId) {
     return (
-      <div className="flex items-center justify-center h-screen bg-slate-950">
-        <Loader2 className="w-8 h-8 text-fuchsia-300 animate-spin" />
+      <div className="flex items-center justify-center h-screen bg-gray-50 dark:bg-slate-950">
+        <Loader2 className="w-8 h-8 text-fuchsia-500 dark:text-fuchsia-300 animate-spin" />
       </div>
     )
   }
 
   return (
-    <div className="min-h-screen p-8 space-y-6 bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950 text-slate-100">
+    <div className="min-h-screen p-8 space-y-6 bg-gradient-to-br from-gray-50 via-white to-gray-50 dark:from-slate-950 dark:via-slate-900 dark:to-slate-950 text-gray-900 dark:text-slate-100">
       {/* Header */}
       <div className="flex flex-wrap items-center justify-between gap-4">
         <div>
-          <p className="text-xs uppercase tracking-[0.3em] text-white/60">Ledger structure</p>
-          <h1 className="text-3xl font-semibold text-white mt-2">Chart of Accounts</h1>
-          <p className="text-white/60 mt-1">Balances stay synced with every journal entry.</p>
+          <p className="text-xs uppercase tracking-[0.3em] text-gray-600 dark:text-white/60">Ledger structure</p>
+          <h1 className="text-3xl font-semibold text-gray-900 dark:text-white mt-2">Chart of Accounts</h1>
+          <p className="text-gray-600 dark:text-white/60 mt-1">Balances stay synced with every journal entry.</p>
         </div>
         <div className="flex gap-3 flex-wrap">
-          <button onClick={exportToCSV} className="px-4 py-2 rounded-full border border-white/15 bg-white/5 text-sm font-medium flex items-center gap-2">
+          <button onClick={exportToCSV} className="px-4 py-2 rounded-full border border-gray-300 dark:border-white/15 bg-white dark:bg-white/5 text-sm font-medium flex items-center gap-2 text-gray-700 dark:text-white">
             <Download className="w-4 h-4" />
             Export CSV
           </button>
-          <label className="px-4 py-2 rounded-full border border-white/15 bg-white/5 text-sm font-medium flex items-center gap-2 cursor-pointer">
+          <label className="px-4 py-2 rounded-full border border-gray-300 dark:border-white/15 bg-white dark:bg-white/5 text-sm font-medium flex items-center gap-2 cursor-pointer text-gray-700 dark:text-white">
             <Upload className="w-4 h-4" />
             {uploadingCSV ? 'Uploading...' : 'Upload CSV'}
             <input
@@ -202,26 +202,26 @@ export default function ChartOfAccounts() {
 
       <div className="grid md:grid-cols-3 xl:grid-cols-5 gap-4">
         {['asset', 'liability', 'equity', 'revenue', 'expense'].map(type => (
-          <div key={type} className="rounded-3xl border border-white/10 bg-white/5 backdrop-blur-xl p-4">
-            <p className="text-xs uppercase tracking-widest text-white/50">{type}</p>
-            <p className="text-2xl font-semibold text-white mt-2">
+          <div key={type} className="rounded-3xl border border-gray-200 dark:border-white/10 bg-white dark:bg-white/5 backdrop-blur-xl p-4 shadow-sm">
+            <p className="text-xs uppercase tracking-widest text-gray-500 dark:text-white/50">{type}</p>
+            <p className="text-2xl font-semibold text-gray-900 dark:text-white mt-2">
               ${(totalsByType[type] || 0).toLocaleString()}
             </p>
-            <p className="text-white/40 text-xs mt-1">Current balance</p>
+            <p className="text-gray-500 dark:text-white/40 text-xs mt-1">Current balance</p>
           </div>
         ))}
       </div>
 
       {/* Filter Tabs */}
-      <div className="flex gap-2 border-b border-white/10 overflow-x-auto">
+      <div className="flex gap-2 border-b border-gray-200 dark:border-white/10 overflow-x-auto">
         {['all', 'asset', 'liability', 'equity', 'revenue', 'expense'].map(type => (
           <button
             key={type}
             onClick={() => setFilter(type)}
             className={`px-4 py-2 text-sm font-semibold border-b-2 transition-colors ${
               filter === type
-                ? 'border-fuchsia-400 text-white'
-                : 'border-transparent text-white/50 hover:text-white'
+                ? 'border-fuchsia-500 text-gray-900 dark:text-white'
+                : 'border-transparent text-gray-500 dark:text-white/50 hover:text-gray-900 dark:hover:text-white'
             }`}
           >
             {type.charAt(0).toUpperCase() + type.slice(1)}
@@ -232,12 +232,12 @@ export default function ChartOfAccounts() {
       {/* Accounts Tree */}
       {loading ? (
         <div className="text-center py-12">
-          <Loader2 className="w-8 h-8 text-white/60 animate-spin mx-auto" />
+          <Loader2 className="w-8 h-8 text-gray-400 dark:text-white/60 animate-spin mx-auto" />
         </div>
       ) : (
-        <div className="rounded-3xl border border-white/10 bg-white/5 backdrop-blur-xl overflow-hidden">
+        <div className="rounded-3xl border border-gray-200 dark:border-white/10 bg-white dark:bg-white/5 backdrop-blur-xl overflow-hidden shadow-lg">
           {/* Table Header */}
-          <div className="grid grid-cols-12 gap-4 px-6 py-4 border-b border-white/10 text-xs font-semibold text-white/60 uppercase tracking-wide">
+          <div className="grid grid-cols-12 gap-4 px-6 py-4 border-b border-gray-200 dark:border-white/10 text-xs font-semibold text-gray-600 dark:text-white/60 uppercase tracking-wide bg-gray-50 dark:bg-transparent">
             <div className="col-span-1">Code</div>
             <div className="col-span-4">Account Name</div>
             <div className="col-span-2">Type</div>
@@ -248,17 +248,17 @@ export default function ChartOfAccounts() {
 
           {/* Accounts */}
           {filteredAccounts.length > 0 ? (
-            <div className="divide-y divide-white/10">
+            <div className="divide-y divide-gray-200 dark:divide-white/10">
               {filteredAccounts.map(account => (
                 <div key={account.id}>
                   {/* Parent Account */}
-                  <div className="grid grid-cols-12 gap-4 px-6 py-4 hover:bg-white/5 transition-colors">
-                    <div className="col-span-1 font-mono text-sm text-white">{account.code}</div>
+                  <div className="grid grid-cols-12 gap-4 px-6 py-4 hover:bg-gray-50 dark:hover:bg-white/5 transition-colors">
+                    <div className="col-span-1 font-mono text-sm text-gray-900 dark:text-white">{account.code}</div>
                     <div className="col-span-4 flex items-center gap-2">
                       {account.children && account.children.length > 0 && (
                         <button
                           onClick={() => toggleExpand(account.id)}
-                          className="text-white/50 hover:text-white transition-colors"
+                          className="text-gray-500 dark:text-white/50 hover:text-gray-900 dark:hover:text-white transition-colors"
                         >
                           {account.isExpanded ? (
                             <ChevronDown className="w-4 h-4" />
@@ -267,26 +267,26 @@ export default function ChartOfAccounts() {
                           )}
                         </button>
                       )}
-                      <span className="font-medium text-white">{account.name}</span>
+                      <span className="font-medium text-gray-900 dark:text-white">{account.name}</span>
                     </div>
                     <div className="col-span-2">
-                      <span className="inline-flex px-2 py-1 rounded-lg text-xs font-medium bg-white/10 border border-white/15 text-white">
+                      <span className="inline-flex px-2 py-1 rounded-lg text-xs font-medium bg-gray-100 dark:bg-white/10 border border-gray-300 dark:border-white/15 text-gray-700 dark:text-white">
                         {account.type.charAt(0).toUpperCase() + account.type.slice(1)}
                       </span>
                     </div>
-                    <div className="col-span-2 text-sm text-white/70">
+                    <div className="col-span-2 text-sm text-gray-600 dark:text-white/70">
                       {account.subtype
                         ? account.subtype.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())
                         : '—'}
                     </div>
-                    <div className="col-span-2 text-right font-medium text-white">
+                    <div className="col-span-2 text-right font-medium text-gray-900 dark:text-white">
                       ${account.balance.toLocaleString()}
                     </div>
                     <div className="col-span-1 flex justify-end gap-2">
-                      <button className="text-white/50 hover:text-white">
+                      <button className="text-gray-500 dark:text-white/50 hover:text-gray-900 dark:hover:text-white">
                         <Edit className="w-4 h-4" />
                       </button>
-                      <button className="text-white/50 hover:text-rose-300">
+                      <button className="text-gray-500 dark:text-white/50 hover:text-rose-500 dark:hover:text-rose-300">
                         <Trash2 className="w-4 h-4" />
                       </button>
                     </div>
@@ -296,28 +296,28 @@ export default function ChartOfAccounts() {
                   {account.isExpanded && account.children?.map(child => (
                     <div
                       key={child.id}
-                      className="grid grid-cols-12 gap-4 px-6 py-3 bg-white/5 hover:bg-white/10 transition-colors"
+                      className="grid grid-cols-12 gap-4 px-6 py-3 bg-gray-50 dark:bg-white/5 hover:bg-gray-100 dark:hover:bg-white/10 transition-colors"
                     >
-                      <div className="col-span-1 font-mono text-sm text-white/70 pl-8">{child.code}</div>
-                      <div className="col-span-4 pl-8 text-sm text-white/85">{child.name}</div>
+                      <div className="col-span-1 font-mono text-sm text-gray-700 dark:text-white/70 pl-8">{child.code}</div>
+                      <div className="col-span-4 pl-8 text-sm text-gray-800 dark:text-white/85">{child.name}</div>
                       <div className="col-span-2">
-                        <span className="inline-flex px-2 py-1 rounded-lg text-xs font-medium bg-white/10 border border-white/15 text-white">
+                        <span className="inline-flex px-2 py-1 rounded-lg text-xs font-medium bg-gray-100 dark:bg-white/10 border border-gray-300 dark:border-white/15 text-gray-700 dark:text-white">
                           {child.type.charAt(0).toUpperCase() + child.type.slice(1)}
                         </span>
                       </div>
-                      <div className="col-span-2 text-sm text-white/60">
+                      <div className="col-span-2 text-sm text-gray-600 dark:text-white/60">
                         {child.subtype
                           ? child.subtype.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())
                           : '—'}
                       </div>
-                      <div className="col-span-2 text-right text-sm font-medium text-white/80">
+                      <div className="col-span-2 text-right text-sm font-medium text-gray-800 dark:text-white/80">
                         ${child.balance.toLocaleString()}
                       </div>
                       <div className="col-span-1 flex justify-end gap-2">
-                        <button className="text-white/40 hover:text-white">
+                        <button className="text-gray-400 dark:text-white/40 hover:text-gray-900 dark:hover:text-white">
                           <Edit className="w-4 h-4" />
                         </button>
-                        <button className="text-white/40 hover:text-rose-300">
+                        <button className="text-gray-400 dark:text-white/40 hover:text-rose-500 dark:hover:text-rose-300">
                           <Trash2 className="w-4 h-4" />
                         </button>
                       </div>
@@ -327,8 +327,8 @@ export default function ChartOfAccounts() {
               ))}
             </div>
           ) : (
-            <div className="text-center py-12 text-white/60">
-              <FolderTree className="w-12 h-12 mx-auto mb-3 text-white/30" />
+            <div className="text-center py-12 text-gray-600 dark:text-white/60">
+              <FolderTree className="w-12 h-12 mx-auto mb-3 text-gray-400 dark:text-white/30" />
               <p>No accounts found</p>
               <p className="text-sm mt-1">Upload a CSV or create your first account</p>
             </div>
@@ -337,18 +337,18 @@ export default function ChartOfAccounts() {
       )}
 
       {/* CSV Upload Instructions */}
-      <div className="relative overflow-hidden rounded-3xl border border-white/10 bg-gradient-to-r from-slate-900/80 to-slate-900/40 p-6">
-        <div className="absolute inset-y-0 right-0 w-1/3 bg-gradient-to-l from-fuchsia-500/10 to-transparent pointer-events-none" />
+      <div className="relative overflow-hidden rounded-3xl border border-gray-200 dark:border-white/10 bg-gradient-to-r from-gray-50 to-white dark:from-slate-900/80 dark:to-slate-900/40 p-6 shadow-lg">
+        <div className="absolute inset-y-0 right-0 w-1/3 bg-gradient-to-l from-fuchsia-500/5 dark:from-fuchsia-500/10 to-transparent pointer-events-none" />
         <div className="relative space-y-3">
-          <p className="text-xs uppercase tracking-[0.35em] text-white/60">CSV format</p>
-          <h3 className="text-2xl font-semibold text-white">Import your ledger structure</h3>
-          <p className="text-sm text-white/70">
+          <p className="text-xs uppercase tracking-[0.35em] text-gray-600 dark:text-white/60">CSV format</p>
+          <h3 className="text-2xl font-semibold text-gray-900 dark:text-white">Import your ledger structure</h3>
+          <p className="text-sm text-gray-700 dark:text-white/70">
             Keep columns in this order so every account lands in the right place.
           </p>
-          <code className="block w-full rounded-2xl border border-white/15 bg-white/5 px-4 py-3 font-mono text-sm text-white">
+          <code className="block w-full rounded-2xl border border-gray-300 dark:border-white/15 bg-gray-100 dark:bg-white/5 px-4 py-3 font-mono text-sm text-gray-900 dark:text-white">
             Account Code, Account Name, Type, Subtype, Opening Balance
           </code>
-          <p className="text-xs text-white/50">
+          <p className="text-xs text-gray-600 dark:text-white/50">
             Supported types: asset, liability, equity, revenue, expense
           </p>
         </div>

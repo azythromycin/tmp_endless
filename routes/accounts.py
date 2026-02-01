@@ -1,12 +1,12 @@
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Depends
 from pydantic import BaseModel
-from typing import Optional
+from typing import Optional, Dict
 from database import supabase
+from middleware.auth import get_current_user_company
 
 router = APIRouter()
 
 class AccountCreate(BaseModel):
-    company_id: str
     account_code: str
     account_name: str
     type: str  # asset, liability, equity, revenue, expense
@@ -23,14 +23,23 @@ class AccountUpdate(BaseModel):
     balance: Optional[float] = None
 
 @router.get("/")
-def get_all_accounts():
-    """Get all accounts"""
-    response = supabase.table("accounts").select("*").execute()
+def get_all_accounts(auth: Dict[str, str] = Depends(get_current_user_company)):
+    """Get all accounts for authenticated user's company"""
+    company_id = auth["company_id"]
+    response = supabase.table("accounts")\
+        .select("*")\
+        .eq("company_id", company_id)\
+        .order("account_code")\
+        .execute()
     return response.data
 
 @router.get("/company/{company_id}")
-def get_company_accounts(company_id: str):
-    """Get all accounts for a specific company"""
+def get_company_accounts(company_id: str, auth: Dict[str, str] = Depends(get_current_user_company)):
+    """Get all accounts for a specific company (must own the company)"""
+    # Verify user owns this company
+    if auth["company_id"] != company_id:
+        raise HTTPException(status_code=403, detail="Cannot access another company's accounts")
+
     response = supabase.table("accounts")\
         .select("*")\
         .eq("company_id", company_id)\
@@ -39,11 +48,14 @@ def get_company_accounts(company_id: str):
     return response.data
 
 @router.get("/{account_id}")
-def get_account(account_id: str):
+def get_account(account_id: str, auth: Dict[str, str] = Depends(get_current_user_company)):
     """Get a specific account"""
+    company_id = auth["company_id"]
+
     response = supabase.table("accounts")\
         .select("*")\
         .eq("id", account_id)\
+        .eq("company_id", company_id)\
         .single()\
         .execute()
 
@@ -53,27 +65,19 @@ def get_account(account_id: str):
     return response.data
 
 @router.post("/")
-def create_account(account: dict):
-    """Create a new account"""
+def create_account(account: AccountCreate, auth: Dict[str, str] = Depends(get_current_user_company)):
+    """Create a new account for authenticated user's company"""
     try:
-        # Log what we received for debugging
-        print(f"Received account data: {account}")
-        print(f"company_id value: {account.get('company_id')}")
-
-        company_id = account.get("company_id")
-        if not company_id:
-            raise HTTPException(status_code=400, detail="company_id is required")
+        company_id = auth["company_id"]  # Use authenticated company_id
 
         account_data = {
             "company_id": company_id,
-            "account_code": account.get("account_code"),
-            "account_name": account.get("account_name"),
-            "account_type": account.get("type"),  # Map 'type' to 'account_type'
-            "account_subtype": account.get("subtype"),  # Map 'subtype' to 'account_subtype'
-            "parent_account_id": account.get("parent_account_id"),
+            "account_code": account.account_code,
+            "account_name": account.account_name,
+            "account_type": account.type,
+            "account_subtype": account.subtype,
+            "parent_account_id": account.parent_account_id,
         }
-
-        print(f"Attempting to insert: {account_data}")
 
         response = supabase.table("accounts").insert(account_data).execute()
 
@@ -86,8 +90,10 @@ def create_account(account: dict):
         raise HTTPException(status_code=400, detail=str(e))
 
 @router.patch("/{account_id}")
-def update_account(account_id: str, account: AccountUpdate):
+def update_account(account_id: str, account: AccountUpdate, auth: Dict[str, str] = Depends(get_current_user_company)):
     """Update an existing account"""
+    company_id = auth["company_id"]
+
     # Only include fields that are provided
     update_data = {k: v for k, v in account.dict().items() if v is not None}
 
@@ -97,6 +103,7 @@ def update_account(account_id: str, account: AccountUpdate):
     response = supabase.table("accounts")\
         .update(update_data)\
         .eq("id", account_id)\
+        .eq("company_id", company_id)\
         .execute()
 
     if not response.data:
@@ -105,8 +112,21 @@ def update_account(account_id: str, account: AccountUpdate):
     return response.data[0]
 
 @router.delete("/{account_id}")
-def delete_account(account_id: str):
+def delete_account(account_id: str, auth: Dict[str, str] = Depends(get_current_user_company)):
     """Delete an account"""
+    company_id = auth["company_id"]
+
+    # Verify account belongs to user's company
+    account_check = supabase.table("accounts")\
+        .select("id")\
+        .eq("id", account_id)\
+        .eq("company_id", company_id)\
+        .single()\
+        .execute()
+
+    if not account_check.data:
+        raise HTTPException(status_code=404, detail="Account not found")
+
     # Check if account has any transactions
     journal_lines = supabase.table("journal_lines")\
         .select("id")\

@@ -18,7 +18,6 @@ interface AuthContextType {
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined)
-const demoMode = process.env.NEXT_PUBLIC_DEMO_MODE === 'true'
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null)
@@ -57,37 +56,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   }
 
-  const initializeDemoContext = useCallback(async () => {
-    setLoading(true)
-    try {
-      const response = await api.get('/companies/')
-      const firstCompany = response.data?.[0] || null
-      setCompany(firstCompany)
-      setUser({
-        id: 'demo-user',
-        email: 'demo@endless.finance',
-        full_name: 'Demo User',
-        role: 'admin',
-        company_id: firstCompany?.id ?? null,
-        created_at: new Date().toISOString()
-      })
-    } catch (error) {
-      console.error('Demo mode: failed to fetch companies', error)
-      setUser(null)
-      setCompany(null)
-    } finally {
-      setLoading(false)
-    }
-  }, [])
-
   useEffect(() => {
-    if (demoMode) {
-      initializeDemoContext()
-      return
-    }
-
     if (!supabase) {
-      console.error('Supabase client is not configured. Set NEXT_PUBLIC_SUPABASE_URL / KEY or enable demo mode.')
+      console.error('Supabase client is not configured. Set NEXT_PUBLIC_SUPABASE_URL / KEY.')
       setLoading(false)
       return
     }
@@ -114,17 +85,22 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     })
 
     return () => subscription.unsubscribe()
-  }, [initializeDemoContext])
+  }, [])
 
   const signUp = async (email: string, password: string, fullName: string) => {
-    if (demoMode || !supabase) {
-      throw new Error('Authentication is disabled in demo mode.')
+    if (!supabase) {
+      throw new Error('Supabase client not configured.')
     }
     try {
+      const redirectUrl = typeof window !== 'undefined'
+        ? `${window.location.origin}/auth/callback`
+        : 'http://localhost:3000/auth/callback'
+
       const { data, error } = await supabase.auth.signUp({
         email,
         password,
         options: {
+          emailRedirectTo: redirectUrl,
           data: {
             full_name: fullName,
           },
@@ -153,11 +129,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           throw new Error(errorData.detail || 'Failed to create user record')
         }
 
-        // Fetch and set the user data
-        await fetchUserData(data.user)
-
-        // Redirect to company setup
-        router.push('/company-setup')
+        // Don't redirect yet - user needs to confirm email first
+        // The signup page will show a message to check email
       }
     } catch (error: any) {
       throw new Error(error.message || 'Failed to sign up')
@@ -165,8 +138,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }
 
   const signIn = async (email: string, password: string) => {
-    if (demoMode || !supabase) {
-      throw new Error('Authentication is disabled in demo mode.')
+    if (!supabase) {
+      throw new Error('Supabase client not configured.')
     }
     try {
       const { data, error } = await supabase.auth.signInWithPassword({
@@ -187,9 +160,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           .single()
 
         if (!userData?.company_id) {
-          router.push('/company-setup')
+          router.push('/onboarding')
         } else if (!(userData.companies as any)?.onboarding_completed) {
-          router.push('/company-setup')
+          router.push('/onboarding')
         } else {
           router.push('/new-dashboard')
         }
@@ -200,7 +173,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }
 
   const signOut = async () => {
-    if (demoMode || !supabase) {
+    if (!supabase) {
       setUser(null)
       setCompany(null)
       return
@@ -217,10 +190,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }
 
   const refreshUser = async () => {
-    if (demoMode) {
-      await initializeDemoContext()
-      return
-    }
     if (supabaseUser) {
       await fetchUserData(supabaseUser)
     }

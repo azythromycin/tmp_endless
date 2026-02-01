@@ -1,8 +1,10 @@
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Depends
 import os
 from datetime import datetime
 from database import table
 import re
+from typing import Dict
+from middleware.auth import get_current_user_company
 
 router = APIRouter(prefix="/ai", tags=["AI Overlook"])
 
@@ -170,18 +172,15 @@ def overlook_expense(expense_data: dict):
 
 
 @router.post("/query")
-def ai_query(query_data: dict):
+def ai_query(query_data: dict, auth: Dict[str, str] = Depends(get_current_user_company)):
     """
     AI-powered financial assistant that answers questions about your financial data.
     Analyzes journal entries, chart of accounts, and account balances.
     Acts as a helpful, friendly accountant companion.
     """
     try:
-        company_id = query_data.get("company_id")
+        company_id = auth["company_id"]  # Use authenticated company_id
         question = query_data.get("question", "").strip()
-
-        if not company_id:
-            raise HTTPException(status_code=400, detail="company_id is required")
 
         if not question:
             raise HTTPException(status_code=400, detail="question is required")

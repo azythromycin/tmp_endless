@@ -1,12 +1,14 @@
 'use client'
 
-import { useState } from 'react'
-import { Building2, Mail, Lock, Eye, EyeOff } from 'lucide-react'
+import { useState, useEffect } from 'react'
+import { useSearchParams } from 'next/navigation'
+import { Building2, Mail, Lock, Eye, EyeOff, CheckCircle } from 'lucide-react'
 import Link from 'next/link'
 import { useAuth } from '@/contexts/AuthContext'
 
 export default function Login() {
   const { signIn } = useAuth()
+  const searchParams = useSearchParams()
   const [showPassword, setShowPassword] = useState(false)
   const [formData, setFormData] = useState({
     email: '',
@@ -14,6 +16,15 @@ export default function Login() {
   })
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
+  const [showConfirmation, setShowConfirmation] = useState(false)
+
+  useEffect(() => {
+    if (searchParams.get('confirmed') === 'true') {
+      setShowConfirmation(true)
+      // Hide after 5 seconds
+      setTimeout(() => setShowConfirmation(false), 5000)
+    }
+  }, [searchParams])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -47,6 +58,17 @@ export default function Login() {
 
         {/* Login Form */}
         <div className="bg-white rounded-2xl border border-gray-200 p-8 shadow-xl">
+          {showConfirmation && (
+            <div className="mb-4 p-4 bg-emerald-50 border border-emerald-200 rounded-lg">
+              <div className="flex items-center gap-3">
+                <CheckCircle className="w-5 h-5 text-emerald-600 flex-shrink-0" />
+                <div>
+                  <p className="text-emerald-900 font-medium">Email confirmed successfully!</p>
+                  <p className="text-emerald-700 text-sm">You can now sign in to your account.</p>
+                </div>
+              </div>
+            </div>
+          )}
           {error && (
             <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg text-red-700 text-sm">
               {error}

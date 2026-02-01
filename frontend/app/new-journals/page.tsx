@@ -269,23 +269,23 @@ export default function NewJournals() {
 
   if (!companyId) {
     return (
-      <div className="flex items-center justify-center h-screen bg-slate-950">
-        <Loader2 className="w-8 h-8 text-fuchsia-300 animate-spin" />
+      <div className="flex items-center justify-center h-screen bg-gray-50 dark:bg-slate-950">
+        <Loader2 className="w-8 h-8 text-fuchsia-500 dark:text-fuchsia-300 animate-spin" />
       </div>
     )
   }
 
   return (
-    <div className="min-h-screen p-8 space-y-6 bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950 text-slate-100">
+    <div className="min-h-screen p-8 space-y-6 bg-gradient-to-br from-gray-50 via-white to-gray-50 dark:from-slate-950 dark:via-slate-900 dark:to-slate-950 text-gray-900 dark:text-slate-100">
       {/* Header */}
       <div className="flex flex-wrap items-center justify-between gap-4">
         <div>
-          <p className="text-xs uppercase tracking-[0.3em] text-white/60">Double-entry studio</p>
-          <h1 className="text-3xl font-semibold text-white mt-2">Journal entries</h1>
-          <p className="text-white/60 mt-1">Build entries manually or import from documents.</p>
+          <p className="text-xs uppercase tracking-[0.3em] text-gray-600 dark:text-white/60">Double-entry studio</p>
+          <h1 className="text-3xl font-semibold text-gray-900 dark:text-white mt-2">Journal entries</h1>
+          <p className="text-gray-600 dark:text-white/60 mt-1">Build entries manually or import from documents.</p>
         </div>
         <div className="flex gap-3">
-          <label className="px-4 py-2 rounded-full border border-white/15 bg-white/5 text-sm font-medium flex items-center gap-2 cursor-pointer">
+          <label className="px-4 py-2 rounded-full border border-gray-300 dark:border-white/15 bg-white dark:bg-white/5 text-sm font-medium flex items-center gap-2 cursor-pointer text-gray-700 dark:text-white">
             <Upload className="w-4 h-4" />
             Upload Receipt
             <input
@@ -298,7 +298,7 @@ export default function NewJournals() {
           </label>
           <button
             onClick={() => setIsCreating(true)}
-            className="px-4 py-2 rounded-full bg-gradient-to-r from-fuchsia-500 to-indigo-500 text-sm font-semibold flex items-center gap-2 shadow-[0_10px_35px_rgba(129,80,255,0.4)]"
+            className="px-4 py-2 rounded-full bg-gradient-to-r from-fuchsia-500 to-indigo-500 text-sm font-semibold flex items-center gap-2 shadow-[0_10px_35px_rgba(129,80,255,0.4)] text-white"
           >
             <Plus className="w-4 h-4" />
             New Entry
@@ -320,21 +320,21 @@ export default function NewJournals() {
 
       {/* OCR Processing Indicator */}
       {isOCRProcessing && (
-        <div className="border border-white/10 rounded-2xl p-4 flex items-center gap-3 bg-white/5">
-          <Loader2 className="w-5 h-5 text-fuchsia-200 animate-spin" />
+        <div className="border border-gray-200 dark:border-white/10 rounded-2xl p-4 flex items-center gap-3 bg-gray-50 dark:bg-white/5">
+          <Loader2 className="w-5 h-5 text-fuchsia-500 dark:text-fuchsia-200 animate-spin" />
           <div>
-            <p className="font-medium text-white">Processing document...</p>
-            <p className="text-sm text-white/70">Extracting transaction details with AI</p>
+            <p className="font-medium text-gray-900 dark:text-white">Processing document...</p>
+            <p className="text-sm text-gray-700 dark:text-white/70">Extracting transaction details with AI</p>
           </div>
         </div>
       )}
 
       {/* Journal Entry Form */}
       {isCreating && (
-        <div className="rounded-3xl border border-white/10 bg-white/5 backdrop-blur-xl p-6 space-y-6">
+        <div className="rounded-3xl border border-gray-200 dark:border-white/10 bg-white dark:bg-white/5 backdrop-blur-xl p-6 space-y-6 shadow-lg">
           <div className="flex items-center justify-between">
-            <h2 className="text-xl font-semibold text-white">New Journal Entry</h2>
-            <button onClick={() => setIsCreating(false)} className="text-white/50 hover:text-white">
+            <h2 className="text-xl font-semibold text-gray-900 dark:text-white">New Journal Entry</h2>
+            <button onClick={() => setIsCreating(false)} className="text-gray-500 dark:text-white/50 hover:text-gray-900 dark:hover:text-white">
               <X className="w-5 h-5" />
             </button>
           </div>
@@ -342,32 +342,32 @@ export default function NewJournals() {
           {/* Entry Details */}
           <div className="grid grid-cols-3 gap-4">
             <div>
-              <label className="text-xs uppercase tracking-wide text-white/60">Date</label>
+              <label className="text-xs uppercase tracking-wide text-gray-600 dark:text-white/60">Date</label>
               <input
                 type="date"
                 value={journalEntry.date}
                 onChange={(e) => setJournalEntry({ ...journalEntry, date: e.target.value })}
-                className="mt-2 w-full rounded-2xl bg-white/5 border border-white/10 px-3 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-fuchsia-500/60"
+                className="mt-2 w-full rounded-2xl bg-white dark:bg-white/5 border border-gray-300 dark:border-white/10 px-3 py-2 text-sm text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-fuchsia-500/60"
               />
             </div>
             <div>
-              <label className="text-xs uppercase tracking-wide text-white/60">Reference Number</label>
+              <label className="text-xs uppercase tracking-wide text-gray-600 dark:text-white/60">Reference Number</label>
               <input
                 type="text"
                 value={journalEntry.referenceNumber}
                 onChange={(e) => setJournalEntry({ ...journalEntry, referenceNumber: e.target.value })}
                 placeholder="INV-001"
-                className="mt-2 w-full rounded-2xl bg-white/5 border border-white/10 px-3 py-2 text-sm text-white placeholder:text-white/40 focus:outline-none focus:ring-2 focus:ring-fuchsia-500/60"
+                className="mt-2 w-full rounded-2xl bg-white dark:bg-white/5 border border-gray-300 dark:border-white/10 px-3 py-2 text-sm text-gray-900 dark:text-white placeholder:text-gray-400 dark:placeholder:text-white/40 focus:outline-none focus:ring-2 focus:ring-fuchsia-500/60"
               />
             </div>
             <div className="col-span-1">
-              <label className="text-xs uppercase tracking-wide text-white/60">Memo</label>
+              <label className="text-xs uppercase tracking-wide text-gray-600 dark:text-white/60">Memo</label>
               <input
                 type="text"
                 value={journalEntry.memo}
                 onChange={(e) => setJournalEntry({ ...journalEntry, memo: e.target.value })}
                 placeholder="Description of transaction"
-                className="mt-2 w-full rounded-2xl bg-white/5 border border-white/10 px-3 py-2 text-sm text-white placeholder:text-white/40 focus:outline-none focus:ring-2 focus:ring-fuchsia-500/60"
+                className="mt-2 w-full rounded-2xl bg-white dark:bg-white/5 border border-gray-300 dark:border-white/10 px-3 py-2 text-sm text-gray-900 dark:text-white placeholder:text-gray-400 dark:placeholder:text-white/40 focus:outline-none focus:ring-2 focus:ring-fuchsia-500/60"
               />
             </div>
           </div>
@@ -375,14 +375,14 @@ export default function NewJournals() {
           {/* Journal Lines */}
           <div className="space-y-3">
             <div className="flex items-center justify-between">
-              <h3 className="font-medium text-white">Transaction Lines</h3>
-              <button onClick={addLine} className="text-sm text-fuchsia-300 hover:text-fuchsia-200 font-medium">
+              <h3 className="font-medium text-gray-900 dark:text-white">Transaction Lines</h3>
+              <button onClick={addLine} className="text-sm text-fuchsia-600 dark:text-fuchsia-300 hover:text-fuchsia-700 dark:hover:text-fuchsia-200 font-medium">
                 + Add Line
               </button>
             </div>
 
             {/* Table Header */}
-            <div className="grid grid-cols-12 gap-3 text-xs font-semibold text-white/50 pb-2 border-b border-white/10 uppercase tracking-wide">
+            <div className="grid grid-cols-12 gap-3 text-xs font-semibold text-gray-600 dark:text-white/50 pb-2 border-b border-gray-200 dark:border-white/10 uppercase tracking-wide bg-gray-50 dark:bg-transparent">
               <div className="col-span-3">Account</div>
               <div className="col-span-4">Description</div>
               <div className="col-span-2 text-right">Debit</div>
@@ -397,7 +397,7 @@ export default function NewJournals() {
                   <select
                     value={line.accountId}
                     onChange={(e) => updateLine(line.id, 'accountId', e.target.value)}
-                    className="w-full rounded-2xl bg-white/5 border border-white/10 px-3 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-fuchsia-500/60"
+                    className="w-full rounded-2xl bg-white dark:bg-white/5 border border-gray-300 dark:border-white/10 px-3 py-2 text-sm text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-fuchsia-500/60"
                   >
                     <option value="">Select account...</option>
                     {accounts.map(account => (
@@ -413,7 +413,7 @@ export default function NewJournals() {
                     value={line.description}
                     onChange={(e) => updateLine(line.id, 'description', e.target.value)}
                     placeholder="Line description"
-                    className="w-full rounded-2xl bg-white/5 border border-white/10 px-3 py-2 text-sm text-white placeholder:text-white/40 focus:outline-none focus:ring-2 focus:ring-fuchsia-500/60"
+                    className="w-full rounded-2xl bg-white dark:bg-white/5 border border-gray-300 dark:border-white/10 px-3 py-2 text-sm text-gray-900 dark:text-white placeholder:text-gray-400 dark:placeholder:text-white/40 focus:outline-none focus:ring-2 focus:ring-fuchsia-500/60"
                   />
                 </div>
                 <div className="col-span-2">
@@ -423,7 +423,7 @@ export default function NewJournals() {
                     value={line.debit || ''}
                     onChange={(e) => updateLine(line.id, 'debit', parseFloat(e.target.value) || 0)}
                     placeholder="0.00"
-                    className="w-full rounded-2xl bg-white/5 border border-white/10 px-3 py-2 text-sm text-white placeholder:text-white/40 text-right focus:outline-none focus:ring-2 focus:ring-fuchsia-500/60"
+                    className="w-full rounded-2xl bg-white dark:bg-white/5 border border-gray-300 dark:border-white/10 px-3 py-2 text-sm text-gray-900 dark:text-white placeholder:text-gray-400 dark:placeholder:text-white/40 text-right focus:outline-none focus:ring-2 focus:ring-fuchsia-500/60"
                   />
                 </div>
                 <div className="col-span-2">
@@ -433,13 +433,13 @@ export default function NewJournals() {
                     value={line.credit || ''}
                     onChange={(e) => updateLine(line.id, 'credit', parseFloat(e.target.value) || 0)}
                     placeholder="0.00"
-                    className="w-full rounded-2xl bg-white/5 border border-white/10 px-3 py-2 text-sm text-white placeholder:text-white/40 text-right focus:outline-none focus:ring-2 focus:ring-fuchsia-500/60"
+                    className="w-full rounded-2xl bg-white dark:bg-white/5 border border-gray-300 dark:border-white/10 px-3 py-2 text-sm text-gray-900 dark:text-white placeholder:text-gray-400 dark:placeholder:text-white/40 text-right focus:outline-none focus:ring-2 focus:ring-fuchsia-500/60"
                   />
                 </div>
                 <div className="col-span-1 flex justify-end">
                   <button
                     onClick={() => removeLine(line.id)}
-                    className="text-rose-300 hover:text-rose-200"
+                    className="text-rose-500 dark:text-rose-300 hover:text-rose-600 dark:hover:text-rose-200"
                   >
                     <X className="w-4 h-4" />
                   </button>
@@ -449,16 +449,16 @@ export default function NewJournals() {
           </div>
 
           {/* Totals */}
-          <div className="border-t border-white/10 pt-4">
+          <div className="border-t border-gray-200 dark:border-white/10 pt-4">
             <div className="grid grid-cols-12 gap-3 text-sm font-medium">
-              <div className="col-span-7 text-right text-white/70">Totals:</div>
+              <div className="col-span-7 text-right text-gray-700 dark:text-white/70">Totals:</div>
               <div className="col-span-2">
-                <div className={`px-3 py-2 rounded-lg text-right ${totalDebit > 0 ? 'bg-emerald-500/15 text-emerald-200' : 'bg-white/5 text-white/60'}`}>
+                <div className={`px-3 py-2 rounded-lg text-right ${totalDebit > 0 ? 'bg-emerald-100 dark:bg-emerald-500/15 text-emerald-700 dark:text-emerald-200' : 'bg-gray-100 dark:bg-white/5 text-gray-600 dark:text-white/60'}`}>
                   ${totalDebit.toFixed(2)}
                 </div>
               </div>
               <div className="col-span-2">
-                <div className={`px-3 py-2 rounded-lg text-right ${totalCredit > 0 ? 'bg-rose-500/15 text-rose-200' : 'bg-white/5 text-white/60'}`}>
+                <div className={`px-3 py-2 rounded-lg text-right ${totalCredit > 0 ? 'bg-rose-100 dark:bg-rose-500/15 text-rose-700 dark:text-rose-200' : 'bg-gray-100 dark:bg-white/5 text-gray-600 dark:text-white/60'}`}>
                   ${totalCredit.toFixed(2)}
                 </div>
               </div>
@@ -467,12 +467,12 @@ export default function NewJournals() {
             {/* Balance Status */}
             <div className="mt-3 flex items-center gap-2">
               {balanced ? (
-                <div className="flex items-center gap-2 text-emerald-200">
+                <div className="flex items-center gap-2 text-emerald-700 dark:text-emerald-200">
                   <Check className="w-5 h-5" />
                   <span className="text-sm font-medium">Entry is balanced</span>
                 </div>
               ) : (
-                <div className="flex items-center gap-2 text-amber-300">
+                <div className="flex items-center gap-2 text-amber-700 dark:text-amber-300">
                   <AlertCircle className="w-5 h-5" />
                   <span className="text-sm font-medium">
                     Out of balance by ${Math.abs(totalDebit - totalCredit).toFixed(2)}
@@ -486,7 +486,7 @@ export default function NewJournals() {
           <div className="flex gap-3 justify-end">
             <button
               onClick={() => saveJournalEntry(false)}
-              className="px-4 py-2 rounded-full border border-white/15 bg-white/5 text-sm font-medium text-white/80 transition hover:text-white hover:border-white/40 disabled:opacity-40 disabled:cursor-not-allowed"
+              className="px-4 py-2 rounded-full border border-gray-300 dark:border-white/15 bg-white dark:bg-white/5 text-sm font-medium text-gray-700 dark:text-white/80 transition hover:text-gray-900 dark:hover:text-white hover:border-gray-400 dark:hover:border-white/40 disabled:opacity-40 disabled:cursor-not-allowed"
               disabled={saving}
               title="Drafts still require balanced debits & credits"
             >
@@ -497,7 +497,7 @@ export default function NewJournals() {
               className={`px-5 py-2 rounded-full text-sm font-semibold transition-all ${
                 balanced && !saving
                   ? 'bg-gradient-to-r from-fuchsia-500 via-purple-500 to-indigo-500 text-white shadow-[0_20px_60px_rgba(129,80,255,0.45)] hover:shadow-[0_25px_70px_rgba(129,80,255,0.6)]'
-                  : 'bg-white/10 text-white/40 border border-white/15'
+                  : 'bg-gray-200 dark:bg-white/10 text-gray-400 dark:text-white/40 border border-gray-300 dark:border-white/15'
               }`}
               disabled={saving}
               title={balanced ? '' : 'Balance debits and credits to post'}
@@ -509,32 +509,32 @@ export default function NewJournals() {
       )}
 
       {/* Recent Journals */}
-      <div className="rounded-3xl border border-white/10 bg-white/5 backdrop-blur-xl p-6">
+      <div className="rounded-3xl border border-gray-200 dark:border-white/10 bg-white dark:bg-white/5 backdrop-blur-xl p-6 shadow-lg">
         <div className="flex items-center justify-between mb-4">
-          <h2 className="text-xl font-semibold text-white">Recent Journal Entries</h2>
-          <span className="text-xs text-white/50 uppercase tracking-widest">{recentJournals.length} entries</span>
+          <h2 className="text-xl font-semibold text-gray-900 dark:text-white">Recent Journal Entries</h2>
+          <span className="text-xs text-gray-500 dark:text-white/50 uppercase tracking-widest">{recentJournals.length} entries</span>
         </div>
         {loading ? (
           <div className="text-center py-12">
-            <Loader2 className="w-8 h-8 text-white/50 animate-spin mx-auto" />
+            <Loader2 className="w-8 h-8 text-gray-400 dark:text-white/50 animate-spin mx-auto" />
           </div>
         ) : recentJournals.length > 0 ? (
           <div className="space-y-3">
             {recentJournals.map(journal => (
-              <div key={journal.id} className="rounded-2xl border border-white/10 bg-white/5 p-4 space-y-3">
+              <div key={journal.id} className="rounded-2xl border border-gray-200 dark:border-white/10 bg-gray-50 dark:bg-white/5 p-4 space-y-3">
                 <div className="flex items-center justify-between">
                   <div>
-                    <p className="text-sm text-white/60">{journal.entry_date ? new Date(journal.entry_date).toLocaleDateString() : '—'}</p>
-                    <p className="text-lg font-semibold text-white">{journal.journal_number || 'Pending #'}</p>
-                    <p className="text-sm text-white/60 mt-1">{journal.memo || 'No memo provided'}</p>
+                    <p className="text-sm text-gray-600 dark:text-white/60">{journal.entry_date ? new Date(journal.entry_date).toLocaleDateString() : '—'}</p>
+                    <p className="text-lg font-semibold text-gray-900 dark:text-white">{journal.journal_number || 'Pending #'}</p>
+                    <p className="text-sm text-gray-600 dark:text-white/60 mt-1">{journal.memo || 'No memo provided'}</p>
                   </div>
                   <div className="text-right">
-                    <p className="text-xl font-semibold text-white">${journal.total_debit?.toLocaleString() || '0.00'}</p>
+                    <p className="text-xl font-semibold text-gray-900 dark:text-white">${journal.total_debit?.toLocaleString() || '0.00'}</p>
                     <span
                       className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-medium ${
                         journal.status === 'posted'
-                          ? 'bg-emerald-500/15 text-emerald-200'
-                          : 'bg-white/10 text-white/70'
+                          ? 'bg-emerald-100 dark:bg-emerald-500/15 text-emerald-700 dark:text-emerald-200'
+                          : 'bg-gray-100 dark:bg-white/10 text-gray-700 dark:text-white/70'
                       }`}
                     >
                       {journal.status || 'draft'}
@@ -542,9 +542,9 @@ export default function NewJournals() {
                   </div>
                 </div>
                 {journal.journal_lines && journal.journal_lines.length > 0 && (
-                  <div className="border-t border-white/10 pt-3 space-y-2">
+                  <div className="border-t border-gray-200 dark:border-white/10 pt-3 space-y-2">
                     {journal.journal_lines.slice(0, 3).map((line: any, idx: number) => (
-                      <div key={idx} className="flex justify-between text-sm text-white/70">
+                      <div key={idx} className="flex justify-between text-sm text-gray-700 dark:text-white/70">
                         <span>{line.accounts?.account_name || line.description}</span>
                         <div className="flex gap-6">
                           <span className="w-24 text-right">{line.debit ? `$${line.debit.toFixed(2)}` : '—'}</span>
@@ -558,10 +558,10 @@ export default function NewJournals() {
             ))}
           </div>
         ) : (
-          <div className="text-center py-12 text-white/60">
-            <FileText className="w-12 h-12 mx-auto mb-3 text-white/30" />
+          <div className="text-center py-12 text-gray-600 dark:text-white/60">
+            <FileText className="w-12 h-12 mx-auto mb-3 text-gray-400 dark:text-white/30" />
             <p>No journal entries yet</p>
-            <p className="text-sm mt-1 text-white/40">Create your first entry to get started</p>
+            <p className="text-sm mt-1 text-gray-500 dark:text-white/40">Create your first entry to get started</p>
           </div>
         )}
       </div>
