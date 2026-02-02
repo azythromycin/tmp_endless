@@ -1,221 +1,318 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { api } from "@/lib/api";
 import { useAuth } from "@/contexts/AuthContext";
-import { Loader2, Sparkles, LineChart, Target, Building } from "lucide-react";
+import { Loader2, Sparkles, Target, BarChart3, Globe, Zap, RefreshCw, TrendingUp } from "lucide-react";
 
-interface Message {
-  role: 'user' | 'assistant';
+interface InsightCard {
+  title: string;
   content: string;
-  metadata?: { account_count?: number; journal_count?: number };
+  category: "benchmark" | "growth" | "competitive" | "financial";
+  icon: React.ReactNode;
 }
 
-const sanitize = (text: string) =>
-  text
-    .replace(/\*\*(.*?)\*\*/g, '$1')
-    .replace(/\*/g, '')
-    .trim();
+const CACHE_KEY_PREFIX = 'ai_insights_';
+const CACHE_DURATION = 24 * 60 * 60 * 1000; // 24 hours in milliseconds
 
-const quickPrompts = [
-  "Give me a cash flow outlook for next month",
-  "Break down my top three expense categories",
-  "How balanced are my debits vs credits right now?"
-];
+interface CachedInsights {
+  insights: InsightCard[];
+  accountCount: number;
+  journalCount: number;
+  timestamp: number;
+}
 
 export default function AIConsolePage() {
   const { company } = useAuth();
   const companyId = company?.id || null;
-  const [query, setQuery] = useState("");
   const [loading, setLoading] = useState(false);
-  const [messages, setMessages] = useState<Message[]>([]);
-  const [insightMeta, setInsightMeta] = useState<{ accounts?: number; journals?: number }>({});
+  const [insights, setInsights] = useState<InsightCard[]>([]);
+  const [accountCount, setAccountCount] = useState(0);
+  const [journalCount, setJournalCount] = useState(0);
+  const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
 
-  const handleAsk = async () => {
-    if (!query.trim() || !companyId) return;
+  useEffect(() => {
+    if (companyId) {
+      // Try to load from cache first
+      const cached = loadFromCache(companyId);
+      if (cached) {
+        setInsights(cached.insights);
+        setAccountCount(cached.accountCount);
+        setJournalCount(cached.journalCount);
+        setLastUpdated(new Date(cached.timestamp));
+      } else {
+        // No cache or expired, load fresh insights
+        loadInsights();
+      }
+    }
+  }, [companyId]);
 
-    const userMessage: Message = { role: 'user', content: query };
-    setMessages(prev => [...prev, userMessage]);
-    setQuery("");
+  const loadFromCache = (companyId: string): CachedInsights | null => {
+    try {
+      const cacheKey = `${CACHE_KEY_PREFIX}${companyId}`;
+      const cached = localStorage.getItem(cacheKey);
+      if (!cached) return null;
+
+      const parsed: CachedInsights = JSON.parse(cached);
+      const now = Date.now();
+
+      // Check if cache is expired (older than 24 hours)
+      if (now - parsed.timestamp > CACHE_DURATION) {
+        localStorage.removeItem(cacheKey);
+        return null;
+      }
+
+      return parsed;
+    } catch (error) {
+      console.error("Failed to load from cache:", error);
+      return null;
+    }
+  };
+
+  const saveToCache = (companyId: string, data: CachedInsights) => {
+    try {
+      const cacheKey = `${CACHE_KEY_PREFIX}${companyId}`;
+      localStorage.setItem(cacheKey, JSON.stringify(data));
+    } catch (error) {
+      console.error("Failed to save to cache:", error);
+    }
+  };
+
+  const clearCache = () => {
+    if (!companyId) return;
+    const cacheKey = `${CACHE_KEY_PREFIX}${companyId}`;
+    localStorage.removeItem(cacheKey);
+  };
+
+  const loadInsights = async (forceRefresh = false) => {
+    if (!companyId) return;
+
+    // If not forcing refresh, check cache first
+    if (!forceRefresh) {
+      const cached = loadFromCache(companyId);
+      if (cached) {
+        setInsights(cached.insights);
+        setAccountCount(cached.accountCount);
+        setJournalCount(cached.journalCount);
+        setLastUpdated(new Date(cached.timestamp));
+        return;
+      }
+    }
+
     setLoading(true);
 
     try {
-      const resp = await api.post<{ answer: string; account_count: number; journal_count: number }>(
-        "/ai/query",
-        {
+      // Load multiple insights in parallel
+      const [benchmarkResult, growthResult, competitiveResult] = await Promise.all([
+        // Industry benchmarks
+        api.post<{ answer: string; account_count: number; journal_count: number }>("/ai/query", {
           company_id: companyId,
-          question: userMessage.content,
-        }
-      );
+          question: "What are the industry benchmarks for my business?"
+        }).catch(() => null),
 
-      const assistantMessage: Message = {
-        role: 'assistant',
-        content: sanitize(resp.answer),
-        metadata: {
-          account_count: resp.account_count,
-          journal_count: resp.journal_count,
-        }
-      };
-      setInsightMeta({ accounts: resp.account_count, journals: resp.journal_count });
-      setMessages(prev => [...prev, assistantMessage]);
-    } catch (err: any) {
-      let errorMsg = 'Unknown error';
-      if (err.response?.data?.detail) {
-        errorMsg = typeof err.response.data.detail === 'string'
-          ? err.response.data.detail
-          : JSON.stringify(err.response.data.detail);
-      } else if (err.message) {
-        errorMsg = err.message;
+        // Growth recommendations
+        api.post<{ answer: string; account_count: number; journal_count: number }>("/ai/query", {
+          company_id: companyId,
+          question: "How can I grow my business?"
+        }).catch(() => null),
+
+        // Online presence
+        api.post<{ answer: string; account_count: number; journal_count: number }>("/ai/query", {
+          company_id: companyId,
+          question: "Can you find my online reviews and presence?"
+        }).catch(() => null)
+      ]);
+
+      const newInsights: InsightCard[] = [];
+      let newAccountCount = 0;
+      let newJournalCount = 0;
+
+      if (benchmarkResult) {
+        newInsights.push({
+          title: "Industry Benchmarks",
+          content: benchmarkResult.answer,
+          category: "benchmark",
+          icon: <BarChart3 className="w-5 h-5" />
+        });
+        newAccountCount = benchmarkResult.account_count;
+        newJournalCount = benchmarkResult.journal_count;
       }
 
-      const errorMessage: Message = {
-        role: 'assistant',
-        content: sanitize(
-          errorMsg.includes("OPENAI_API_KEY")
-            ? "AI assistant requires an OpenAI API key on the backend."
-            : `Sorry, I encountered an error: ${errorMsg}`
-        )
-      };
-      setMessages(prev => [...prev, errorMessage]);
+      if (growthResult) {
+        newInsights.push({
+          title: "Growth Opportunities",
+          content: growthResult.answer,
+          category: "growth",
+          icon: <TrendingUp className="w-5 h-5" />
+        });
+      }
+
+      if (competitiveResult) {
+        newInsights.push({
+          title: "Online Presence & Reputation",
+          content: competitiveResult.answer,
+          category: "competitive",
+          icon: <Globe className="w-5 h-5" />
+        });
+      }
+
+      const now = Date.now();
+      setInsights(newInsights);
+      setAccountCount(newAccountCount);
+      setJournalCount(newJournalCount);
+      setLastUpdated(new Date(now));
+
+      // Save to cache
+      saveToCache(companyId, {
+        insights: newInsights,
+        accountCount: newAccountCount,
+        journalCount: newJournalCount,
+        timestamp: now
+      });
+
+    } catch (error: any) {
+      console.error("Failed to load insights:", error);
     } finally {
       setLoading(false);
     }
   };
 
-  const companyBlocked = !companyId;
+  if (!companyId) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-gray-50 via-white to-gray-50 dark:from-slate-950 dark:via-slate-900 dark:to-slate-950 text-gray-900 dark:text-slate-100 p-8 flex items-center justify-center">
+        <div className="text-center">
+          <Target className="w-16 h-16 text-fuchsia-500 dark:text-fuchsia-300 mx-auto mb-4" />
+          <h2 className="text-2xl font-semibold mb-2">Complete Onboarding First</h2>
+          <p className="text-gray-600 dark:text-white/60">Set up your company profile to unlock AI insights.</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-50 via-white to-gray-50 dark:from-slate-950 dark:via-slate-900 dark:to-slate-950 text-gray-900 dark:text-slate-100 p-8 space-y-6">
+
+      {/* Header */}
       <div className="flex flex-col gap-4 rounded-3xl border border-gray-200 dark:border-white/10 bg-white dark:bg-white/5 backdrop-blur-xl p-6 shadow-lg">
         <div className="flex flex-wrap items-center justify-between gap-4">
           <div>
             <div className="inline-flex items-center gap-2 text-xs uppercase tracking-[0.3em] text-gray-600 dark:text-white/60">
-              <Sparkles className="w-4 h-4 text-fuchsia-500 dark:text-fuchsia-300" /> Endless Copilot
+              <Sparkles className="w-4 h-4 text-fuchsia-500 dark:text-fuchsia-300" />
+              Powered by Perplexity AI
             </div>
-            <h1 className="text-3xl font-semibold mt-2 text-gray-900 dark:text-white">Modern AI finance console</h1>
-            <p className="text-sm text-gray-700 dark:text-white/70 mt-1">Ask anything about your ledgers, get perspective instantly.</p>
+            <h1 className="text-3xl font-semibold mt-2 text-gray-900 dark:text-white">Business Intelligence</h1>
+            <p className="text-sm text-gray-700 dark:text-white/70 mt-1">
+              Web-powered insights about your industry, competitors, and growth opportunities.
+            </p>
           </div>
           <div className="flex gap-4 text-sm">
             <div className="px-4 py-3 rounded-2xl border border-gray-200 dark:border-white/10 bg-gray-50 dark:bg-white/5">
               <p className="text-gray-600 dark:text-white/60 text-xs uppercase tracking-wide">Accounts</p>
-              <p className="text-2xl font-semibold text-gray-900 dark:text-white">{insightMeta.accounts ?? '—'}</p>
+              <p className="text-2xl font-semibold text-gray-900 dark:text-white">{accountCount || '—'}</p>
             </div>
             <div className="px-4 py-3 rounded-2xl border border-gray-200 dark:border-white/10 bg-gray-50 dark:bg-white/5">
               <p className="text-gray-600 dark:text-white/60 text-xs uppercase tracking-wide">Journal Entries</p>
-              <p className="text-2xl font-semibold text-gray-900 dark:text-white">{insightMeta.journals ?? '—'}</p>
+              <p className="text-2xl font-semibold text-gray-900 dark:text-white">{journalCount || '—'}</p>
             </div>
           </div>
         </div>
-        <div className="flex flex-wrap gap-2">
-          {quickPrompts.map(prompt => (
-            <button
-              key={prompt}
-              onClick={() => setQuery(prompt)}
-              className="px-4 py-2 text-sm rounded-full border border-gray-300 dark:border-white/10 bg-gray-50 dark:bg-white/5 hover:bg-gray-100 dark:hover:bg-white/10 transition-colors text-gray-700 dark:text-white"
-            >
-              {prompt}
-            </button>
-          ))}
+
+        <div className="flex items-center justify-between gap-4">
+          {loading ? (
+            <div className="flex items-center gap-2 text-sm text-gray-600 dark:text-white/60">
+              <Loader2 className="w-4 h-4 animate-spin" />
+              Loading fresh insights from AI...
+            </div>
+          ) : lastUpdated ? (
+            <div className="flex items-center gap-3">
+              <p className="text-xs text-gray-500 dark:text-white/50">
+                Last updated: {lastUpdated.toLocaleDateString()} at {lastUpdated.toLocaleTimeString()}
+              </p>
+              <span className="text-xs px-2 py-1 rounded-full bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-300">
+                Cached (24h)
+              </span>
+            </div>
+          ) : (
+            <div />
+          )}
+
+          <button
+            onClick={() => {
+              clearCache();
+              loadInsights(true);
+            }}
+            disabled={loading}
+            className="inline-flex items-center gap-2 px-4 py-2 rounded-full border border-gray-300 dark:border-white/10 bg-gray-50 dark:bg-white/5 hover:bg-gray-100 dark:hover:bg-white/10 transition-colors text-sm text-gray-700 dark:text-white disabled:opacity-40 disabled:cursor-not-allowed"
+            title="Clear cache and fetch fresh insights from AI"
+          >
+            <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
+            Refresh Insights
+          </button>
         </div>
       </div>
 
-      <div className="grid lg:grid-cols-[2fr_1fr] gap-6">
-        <div className="rounded-3xl border border-gray-200 dark:border-white/10 bg-white dark:bg-slate-900/70 backdrop-blur-xl overflow-hidden shadow-lg">
-          <div className="border-b border-gray-200 dark:border-white/10 p-5 bg-gray-50 dark:bg-transparent">
-            <label className="text-xs font-semibold uppercase tracking-widest text-gray-600 dark:text-white/60">Prompt Endless AI</label>
-            <div className="mt-3 flex flex-col gap-3">
-              <textarea
-                className="w-full bg-white dark:bg-white/5 border border-gray-300 dark:border-white/10 rounded-2xl p-4 text-sm min-h-[110px] focus:outline-none focus:ring-2 focus:ring-fuchsia-500/60 placeholder:text-gray-400 dark:placeholder:text-white/40 text-gray-900 dark:text-white"
-                rows={3}
-                value={query}
-                onChange={(e) => setQuery(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) {
-                    e.preventDefault();
-                    handleAsk();
-                  }
-                }}
-                placeholder="What signal would you like to uncover?"
-                disabled={companyBlocked}
-              />
-              {companyBlocked && (
-                <div className="text-xs text-amber-700 dark:text-amber-300 bg-amber-100 dark:bg-amber-500/10 border border-amber-300 dark:border-amber-500/30 rounded-2xl px-4 py-2 inline-flex items-center gap-2">
-                  <Target className="w-4 h-4" /> Waiting for demo company to load. Seed data to begin.
-                </div>
-              )}
-              <div className="flex justify-between items-center">
-                <p className="text-xs text-gray-500 dark:text-white/40">Cmd/Ctrl + Enter to submit</p>
-                <button
-                  onClick={handleAsk}
-                  disabled={loading || !query.trim() || companyBlocked}
-                  className="inline-flex items-center gap-2 px-5 py-2 rounded-full bg-gradient-to-r from-fuchsia-500 to-indigo-500 text-sm font-medium tracking-wide disabled:opacity-40 disabled:cursor-not-allowed shadow-[0_10px_35px_rgba(129,80,255,0.4)] text-white"
-                >
-                  <Sparkles className="w-4 h-4" />
-                  {loading ? "Thinking..." : "Generate insight"}
-                </button>
+      {/* AI Insights Grid */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        {loading && insights.length === 0 ? (
+          // Loading skeletons
+          Array.from({ length: 3 }).map((_, idx) => (
+            <div
+              key={idx}
+              className="rounded-3xl border border-gray-200 dark:border-white/10 bg-white dark:bg-white/5 backdrop-blur-xl p-6 shadow-lg animate-pulse"
+            >
+              <div className="h-6 bg-gray-200 dark:bg-white/10 rounded w-1/3 mb-4"></div>
+              <div className="space-y-2">
+                <div className="h-4 bg-gray-200 dark:bg-white/10 rounded"></div>
+                <div className="h-4 bg-gray-200 dark:bg-white/10 rounded w-5/6"></div>
+                <div className="h-4 bg-gray-200 dark:bg-white/10 rounded w-4/6"></div>
               </div>
             </div>
-          </div>
-
-          <div className="h-[420px] overflow-y-auto p-5 space-y-4 custom-scrollbar bg-gray-50 dark:bg-transparent">
-            {messages.length === 0 && (
-              <div className="flex flex-col items-center justify-center text-center text-gray-600 dark:text-white/60 h-full">
-                <LineChart className="w-12 h-12 text-fuchsia-500 dark:text-fuchsia-300 mb-4" />
-                <p className="max-w-sm">
-                  Ask about burn, runway, vendor spend, anomalies, or anything else. I'll blend ledger data with real-time benchmarks.
+          ))
+        ) : (
+          insights.map((insight, idx) => (
+            <div
+              key={idx}
+              className="rounded-3xl border border-gray-200 dark:border-white/10 bg-white dark:bg-slate-900/70 backdrop-blur-xl overflow-hidden shadow-lg"
+            >
+              <div className="border-b border-gray-200 dark:border-white/10 p-5 bg-gradient-to-r from-fuchsia-500/10 to-indigo-500/10 dark:from-fuchsia-500/20 dark:to-indigo-500/20">
+                <div className="flex items-center gap-3">
+                  <div className="p-2 rounded-xl bg-white dark:bg-white/10 text-fuchsia-500 dark:text-fuchsia-300">
+                    {insight.icon}
+                  </div>
+                  <h3 className="text-lg font-semibold text-gray-900 dark:text-white">{insight.title}</h3>
+                </div>
+              </div>
+              <div className="p-5">
+                <p className="text-sm leading-relaxed text-gray-800 dark:text-slate-200 whitespace-pre-wrap">
+                  {insight.content}
                 </p>
               </div>
-            )}
-            {messages.map((msg, idx) => (
-              <div key={idx} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
-                <div
-                  className={`max-w-2xl rounded-3xl px-5 py-4 text-sm leading-relaxed shadow-xl ${
-                    msg.role === 'user'
-                      ? 'bg-gradient-to-r from-fuchsia-500/80 to-indigo-500/80 text-white'
-                      : 'bg-white dark:bg-white/6 border border-gray-200 dark:border-white/10 text-gray-900 dark:text-slate-100'
-                  }`}
-                >
-                  <div className="whitespace-pre-wrap">{msg.content}</div>
-                  {msg.metadata && (
-                    <div className={`text-xs mt-3 ${msg.role === 'user' ? 'text-white/80' : 'text-gray-600 dark:text-white/60'}`}>
-                      Based on {msg.metadata.account_count?.toLocaleString() ?? '—'} accounts • {msg.metadata.journal_count?.toLocaleString() ?? '—'} journal entries
-                    </div>
-                  )}
-                </div>
-              </div>
-            ))}
-            {loading && (
-              <div className="flex justify-start">
-                <div className="bg-gray-100 dark:bg-white/5 border border-gray-300 dark:border-white/10 rounded-2xl px-4 py-3 flex items-center gap-2 text-sm text-gray-700 dark:text-white/60">
-                  <Loader2 className="w-4 h-4 animate-spin" /> Crunching the numbers...
-                </div>
-              </div>
-            )}
-          </div>
-        </div>
-
-        <div className="space-y-4">
-          <div className="rounded-3xl border border-gray-200 dark:border-white/10 bg-white dark:bg-white/5 backdrop-blur-xl p-5 shadow-lg">
-            <div className="flex items-center gap-3 mb-4">
-              <Building className="w-5 h-5 text-fuchsia-500 dark:text-fuchsia-300" />
-              <div>
-                <p className="text-xs uppercase tracking-[0.3em] text-gray-600 dark:text-white/60">Company</p>
-                <p className="text-lg font-semibold text-gray-900 dark:text-white">{company?.name || 'Demo Company'}</p>
-              </div>
             </div>
-            <p className="text-sm text-gray-700 dark:text-white/70">
-              Endless Copilot reads your Supabase data live. Every response blends your ledger with peer benchmarks so you always have context.
-            </p>
-          </div>
-          <div className="rounded-3xl border border-gray-200 dark:border-white/10 bg-gradient-to-br from-gray-50 to-white dark:from-slate-900 dark:to-slate-900/80 p-5 space-y-3 shadow-lg">
-            <h3 className="text-sm font-semibold text-gray-700 dark:text-white/70 uppercase tracking-widest">Power tips</h3>
-            <ul className="space-y-2 text-sm text-gray-800 dark:text-white/80">
-              <li>Ask for summaries plus next actions.</li>
-              <li>Reference specific accounts or vendors for precision.</li>
-              <li>Combine metrics: "Compare marketing spend to revenue growth."</li>
-              <li>Follow up—context is carried automatically.</li>
-            </ul>
-          </div>
+          ))
+        )}
+      </div>
+
+      {/* Bottom Info Card */}
+      <div className="rounded-3xl border border-gray-200 dark:border-white/10 bg-gradient-to-br from-gray-50 to-white dark:from-slate-900 dark:to-slate-900/80 p-6 space-y-3 shadow-lg">
+        <div className="flex items-center gap-3">
+          <Zap className="w-5 h-5 text-fuchsia-500 dark:text-fuchsia-300" />
+          <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Need More Insights?</h3>
+        </div>
+        <p className="text-sm text-gray-700 dark:text-white/70">
+          Use the <strong>Endless Copilot</strong> button (bottom right) to ask specific questions about your finances,
+          competitors, growth strategies, or anything else. The copilot blends your financial data with live web intelligence
+          to give you actionable answers.
+        </p>
+        <div className="flex flex-wrap gap-2 pt-2">
+          <span className="px-3 py-1 text-xs rounded-full bg-gray-200 dark:bg-white/10 text-gray-700 dark:text-white/80">
+            "How can I reduce expenses?"
+          </span>
+          <span className="px-3 py-1 text-xs rounded-full bg-gray-200 dark:bg-white/10 text-gray-700 dark:text-white/80">
+            "Find my competitors' reviews"
+          </span>
+          <span className="px-3 py-1 text-xs rounded-full bg-gray-200 dark:bg-white/10 text-gray-700 dark:text-white/80">
+            "What's my cash flow trend?"
+          </span>
         </div>
       </div>
     </div>

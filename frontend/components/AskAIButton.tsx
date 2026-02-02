@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { Sparkles, X, Send, Loader2 } from 'lucide-react'
+import { Sparkles, X, Send, Loader2, Trash2 } from 'lucide-react'
 import { AnimatePresence, motion } from 'framer-motion'
 import { api } from '@/lib/api'
 import { useAuth } from '@/contexts/AuthContext'
@@ -10,6 +10,14 @@ interface Message {
   role: 'user' | 'assistant'
   content: string
   timestamp: Date
+}
+
+const CHAT_CACHE_KEY = 'endless_ai_chat_';
+const CHAT_CACHE_DURATION = 7 * 24 * 60 * 60 * 1000; // 7 days
+
+interface CachedChat {
+  messages: Message[];
+  timestamp: number;
 }
 
 const sanitizeAIResponse = (text: string) =>
@@ -28,6 +36,20 @@ export default function AskAIButton() {
   const companyContextId = company?.id ?? null
   const [companyId, setCompanyId] = useState<string | null>(null)
   const [attemptedFallback, setAttemptedFallback] = useState(false)
+
+  // Load chat from cache when company ID is available
+  useEffect(() => {
+    if (companyId) {
+      loadChatFromCache(companyId);
+    }
+  }, [companyId]);
+
+  // Save chat to cache whenever messages change
+  useEffect(() => {
+    if (companyId && messages.length > 0) {
+      saveChatToCache(companyId, messages);
+    }
+  }, [messages, companyId]);
 
   useEffect(() => {
     if (companyContextId) {
@@ -52,6 +74,52 @@ export default function AskAIButton() {
 
     fetchFallbackCompany()
   }, [companyContextId, companyId, attemptedFallback])
+
+  const loadChatFromCache = (companyId: string) => {
+    try {
+      const cacheKey = `${CHAT_CACHE_KEY}${companyId}`;
+      const cached = localStorage.getItem(cacheKey);
+      if (!cached) return;
+
+      const parsed: CachedChat = JSON.parse(cached);
+      const now = Date.now();
+
+      // Check if cache is expired
+      if (now - parsed.timestamp > CHAT_CACHE_DURATION) {
+        localStorage.removeItem(cacheKey);
+        return;
+      }
+
+      // Restore messages with Date objects
+      const restoredMessages = parsed.messages.map(msg => ({
+        ...msg,
+        timestamp: new Date(msg.timestamp)
+      }));
+      setMessages(restoredMessages);
+    } catch (error) {
+      console.error('Failed to load chat from cache:', error);
+    }
+  };
+
+  const saveChatToCache = (companyId: string, messages: Message[]) => {
+    try {
+      const cacheKey = `${CHAT_CACHE_KEY}${companyId}`;
+      const cached: CachedChat = {
+        messages,
+        timestamp: Date.now()
+      };
+      localStorage.setItem(cacheKey, JSON.stringify(cached));
+    } catch (error) {
+      console.error('Failed to save chat to cache:', error);
+    }
+  };
+
+  const clearChat = () => {
+    if (!companyId) return;
+    const cacheKey = `${CHAT_CACHE_KEY}${companyId}`;
+    localStorage.removeItem(cacheKey);
+    setMessages([]);
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -148,18 +216,37 @@ export default function AskAIButton() {
                   <Sparkles className="h-5 w-5 text-fuchsia-200" />
                 </div>
                 <div>
-                  <p className="text-xs uppercase tracking-[0.4em] text-white/60">Copilot</p>
+                  <div className="flex items-center gap-2">
+                    <p className="text-xs uppercase tracking-[0.4em] text-white/60">Copilot</p>
+                    {messages.length > 0 && (
+                      <span className="text-[0.6rem] px-1.5 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
+                        Chat saved
+                      </span>
+                    )}
+                  </div>
                   <h3 className="text-lg font-semibold text-white">Realtime finance analyst</h3>
                 </div>
               </div>
-              <motion.button
-                onClick={() => setIsOpen(false)}
-                className="flex h-9 w-9 items-center justify-center rounded-2xl border border-white/15 bg-white/5 text-white/70 transition hover:text-white"
-                whileHover={{ rotate: 90 }}
-                aria-label="Close AI console"
-              >
-                <X className="h-4 w-4" />
-              </motion.button>
+              <div className="flex items-center gap-2">
+                {messages.length > 0 && (
+                  <motion.button
+                    onClick={clearChat}
+                    className="flex h-9 w-9 items-center justify-center rounded-2xl border border-white/15 bg-white/5 text-white/70 transition hover:text-red-400 hover:border-red-400/30"
+                    whileHover={{ scale: 1.05 }}
+                    title="Clear chat history"
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </motion.button>
+                )}
+                <motion.button
+                  onClick={() => setIsOpen(false)}
+                  className="flex h-9 w-9 items-center justify-center rounded-2xl border border-white/15 bg-white/5 text-white/70 transition hover:text-white"
+                  whileHover={{ rotate: 90 }}
+                  aria-label="Close AI console"
+                >
+                  <X className="h-4 w-4" />
+                </motion.button>
+              </div>
             </div>
 
             <div className="relative flex-1 space-y-4 overflow-y-auto px-5 py-4 custom-scrollbar">

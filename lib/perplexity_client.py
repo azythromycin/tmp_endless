@@ -20,8 +20,8 @@ class PerplexityClient:
             raise ValueError("PERPLEXITY_API_KEY not found in environment variables")
 
         self.base_url = "https://api.perplexity.ai"
-        # Use sonar-large-128k-online for real-time web search
-        self.model = "llama-3.1-sonar-large-128k-online"
+        # Use sonar-pro for real-time web search (updated 2026 model)
+        self.model = "sonar-pro"
 
     async def query(
         self,

@@ -70,15 +70,39 @@ def create_company(company: dict):
 
 # Update a company
 @router.patch("/{company_id}")
-def update_company(company_id: str, update_data: dict, auth: Dict[str, str] = Depends(get_current_user_company)):
+async def update_company(company_id: str, update_data: dict, user_id: str = Depends(verify_token)):
     try:
-        # Verify user owns this company
-        if auth["company_id"] != company_id:
+        # Get user's current company_id (if any)
+        user_response = supabase.table("users").select("company_id, id").eq("id", user_id).single().execute()
+
+        if not user_response.data:
+            raise HTTPException(status_code=404, detail="User not found")
+
+        user_company_id = user_response.data.get("company_id")
+
+        # During onboarding, user_company_id might be None
+        # Verify the company exists
+        company_response = supabase.table("companies").select("id").eq("id", company_id).execute()
+
+        if not company_response.data:
+            raise HTTPException(status_code=404, detail="Company not found")
+
+        # Allow update if:
+        # 1. User's company_id matches (already onboarded), OR
+        # 2. User created this company (during onboarding)
+        if user_company_id and user_company_id != company_id:
+            # User has a different company assigned
             raise HTTPException(status_code=403, detail="Cannot update another company")
 
+        # Update the company
         response = table("companies").update(update_data).eq("id", company_id).execute()
         if not response.data:
             raise HTTPException(status_code=404, detail="Company not found.")
+
+        # If user doesn't have a company_id yet, set it now
+        if not user_company_id:
+            supabase.table("users").update({"company_id": company_id}).eq("id", user_id).execute()
+
         return {"status": "success", "data": response.data}
     except HTTPException:
         raise

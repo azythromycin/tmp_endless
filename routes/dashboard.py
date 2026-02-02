@@ -78,10 +78,19 @@ def get_monthly_trend(company_id: str, months: int = 6):
     start_date = (datetime.now() - timedelta(days=months * 30)).strftime("%Y-%m-%d")
 
     journal_entries_response = supabase.table("journal_entries")\
-        .select("id, entry_date, journal_lines(debit, credit, accounts(type))")\
+        .select("id, entry_date, journal_lines(debit, credit, account_id)")\
         .eq("company_id", company_id)\
         .gte("entry_date", start_date)\
         .execute()
+
+    # Get all accounts for this company
+    accounts_response = supabase.table("accounts")\
+        .select("id, type")\
+        .eq("company_id", company_id)\
+        .execute()
+
+    # Create account lookup map
+    account_types = {acc["id"]: acc["type"] for acc in (accounts_response.data or [])}
 
     # Aggregate by month
     monthly_data = defaultdict(lambda: {"income": 0, "expenses": 0})
@@ -91,7 +100,8 @@ def get_monthly_trend(company_id: str, months: int = 6):
         month_key = entry_date.strftime("%b")
 
         for line in entry.get("journal_lines", []):
-            account_type = line.get("accounts", {}).get("type", "")  # Database field is "type"
+            account_id = line.get("account_id")
+            account_type = account_types.get(account_id, "")
             credit = line.get("credit", 0) or 0
             debit = line.get("debit", 0) or 0
 
@@ -124,7 +134,7 @@ def get_category_breakdown(company_id: str):
     accounts_response = supabase.table("accounts")\
         .select("account_name, current_balance")\
         .eq("company_id", company_id)\
-        .eq("type", "expense")  # Database field is "type" not "account_type"
+        .eq("type", "expense")\
         .gt("current_balance", 0)\
         .execute()
 

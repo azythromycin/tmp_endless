@@ -25,7 +25,8 @@ def build_peer_context(revenue: float, expense: float) -> str:
         f"you're tracking at {company_exp_ratio * 100:.0f}% spend and {company_margin * 100:.0f}% margins."
     )
 
-def clean_ai_response(answer: str, peer_context: str) -> str:
+def clean_ai_response(answer: str, peer_context: str = None) -> str:
+    """Basic cleanup - removes markdown and extra whitespace."""
     if not answer:
         return answer
 
@@ -33,10 +34,64 @@ def clean_ai_response(answer: str, peer_context: str) -> str:
     cleaned = cleaned.replace("•", "-").replace("*", "")
     cleaned = " ".join(cleaned.split())
 
-    if peer_context.lower() not in cleaned.lower():
+    if peer_context and peer_context.lower() not in cleaned.lower():
         cleaned = f"{cleaned} Peer snapshot: {peer_context}"
 
     return cleaned.strip()
+
+
+async def format_for_dashboard(raw_response: str, context: str, openai_key: str) -> str:
+    """
+    Two-stage processing: Use OpenAI to format Perplexity's raw data into clean, visual-friendly insights.
+
+    Args:
+        raw_response: Raw text from Perplexity (may have markdown, citations, etc.)
+        context: Context about what type of insight this is
+        openai_key: OpenAI API key
+
+    Returns:
+        Clean, formatted, concise text suitable for dashboard cards
+    """
+    try:
+        from openai import OpenAI
+        client = OpenAI(api_key=openai_key)
+
+        prompt = f"""You are a data visualization expert. Take this raw research data and format it for a business dashboard card.
+
+CONTEXT: {context}
+
+RAW DATA:
+{raw_response}
+
+REQUIREMENTS:
+1. Remove ALL markdown formatting (no #, *, **, [], etc.)
+2. Remove citation numbers [1][2][3]
+3. Extract ONLY the 3-4 most important insights
+4. Make each insight 1-2 sentences max
+5. Use plain text with line breaks between insights
+6. Start each insight with a dash "-"
+7. Keep total response under 120 words
+8. Focus on actionable information
+
+Output clean, dashboard-ready text:"""
+
+        response = client.chat.completions.create(
+            model="gpt-4o-mini",
+            messages=[
+                {"role": "system", "content": "You are a data visualization expert. Extract key insights and format them cleanly."},
+                {"role": "user", "content": prompt}
+            ],
+            temperature=0.3,
+            max_tokens=300
+        )
+
+        formatted = response.choices[0].message.content
+        return formatted.strip()
+
+    except Exception as e:
+        print(f"[FORMAT] Error formatting response: {str(e)}")
+        # Fallback to basic cleaning
+        return clean_ai_response(raw_response)
 
 
 def get_ai_suggestions(company_id: str, vendor_name: str, amount: float, date: str, category: str = None, memo: str = None):
@@ -172,189 +227,385 @@ def overlook_expense(expense_data: dict):
 
 
 @router.post("/query")
-def ai_query(query_data: dict, auth: Dict[str, str] = Depends(get_current_user_company)):
+async def ai_query(query_data: dict, auth: Dict[str, str] = Depends(get_current_user_company)):
     """
-    AI-powered financial assistant that answers questions about your financial data.
-    Analyzes journal entries, chart of accounts, and account balances.
-    Acts as a helpful, friendly accountant companion.
+    AI-powered business intelligence assistant.
+
+    Combines financial data with real-time web intelligence via Perplexity AI.
+    Provides value immediately - even before financial data is logged.
+
+    Routes questions intelligently to:
+    - Industry benchmarks
+    - Competitor analysis & online presence
+    - Growth recommendations
+    - Financial data analysis (when available)
+    - General business advice
     """
     try:
-        company_id = auth["company_id"]  # Use authenticated company_id
+        company_id = auth["company_id"]
         question = query_data.get("question", "").strip()
 
         if not question:
             raise HTTPException(status_code=400, detail="question is required")
 
-        # Check for OpenAI key
+        # Check for Perplexity key (primary) or OpenAI key (fallback)
+        perplexity_key = os.getenv("PERPLEXITY_API_KEY", "")
         openai_key = os.getenv("OPENAI_API_KEY", "")
-        if not openai_key:
+
+        if not perplexity_key and not openai_key:
             raise HTTPException(
                 status_code=503,
-                detail="AI assistant requires OPENAI_API_KEY to be configured. Please add it to your .env file."
+                detail="AI assistant requires PERPLEXITY_API_KEY or OPENAI_API_KEY to be configured."
             )
 
-        # Fetch all financial data for the company
-        try:
-            # Get chart of accounts with balances
-            accounts_resp = table("accounts").select("*").eq("company_id", company_id).execute()
-            accounts = accounts_resp.data or []
+        # ========== Fetch company profile ==========
+        company_resp = table("companies").select("*").eq("id", company_id).execute()
+        company = company_resp.data[0] if company_resp.data else {}
 
-            # Get journal entries with lines
-            journals_resp = table("journal_entries").select("*, journal_lines(*)").eq("company_id", company_id).execute()
-            journals = journals_resp.data or []
-        except Exception as e:
-            raise HTTPException(status_code=500, detail=f"Error fetching financial data: {str(e)}")
+        company_name = company.get("name", "your business")
+        industry = company.get("industry", "general business")
+        website = company.get("website", "")
 
-        # Check if we have any financial data
-        if not accounts and not journals:
-            return {
-                "answer": "I don't see any financial data recorded yet for your company. Once you set up your chart of accounts and start recording journal entries, I'll be able to help you analyze your financial position, identify trends, and answer questions about your accounts!",
-                "account_count": 0,
-                "journal_count": 0
-            }
+        # Construct full location from city + state
+        location_city = company.get("location_city", "")
+        location_state = company.get("location_state", "")
+        location_country = company.get("location_country", "USA")
 
-        # Build comprehensive financial summary for AI
+        # Build location string: "Phoenix, AZ" or "Phoenix, AZ, USA"
+        location_parts = []
+        if location_city:
+            location_parts.append(location_city)
+        if location_state:
+            location_parts.append(location_state)
+        location = ", ".join(location_parts) if location_parts else ""
 
-        # 1. Account Summary by Type
-        account_types = {}
-        for acc in accounts:
-            acc_type = acc.get("account_type", "Unknown")
-            balance = acc.get("current_balance", 0)
-            if acc_type not in account_types:
-                account_types[acc_type] = {"count": 0, "total_balance": 0, "accounts": []}
-            account_types[acc_type]["count"] += 1
-            account_types[acc_type]["total_balance"] += balance
-            account_types[acc_type]["accounts"].append({
-                "code": acc.get("account_code", ""),
-                "name": acc.get("account_name", ""),
-                "balance": balance
-            })
+        business_type = company.get("business_type", "")
+        revenue = company.get("annual_revenue", 0)
+        employees = company.get("employee_count", 0)
 
-        totals_by_type = {
-            acc_type: data["total_balance"]
-            for acc_type, data in account_types.items()
-        }
-        peer_context = build_peer_context(
-            totals_by_type.get("revenue", 0),
-            totals_by_type.get("expense", 0)
-        )
+        # ========== Fetch financial data ==========
+        accounts_resp = table("accounts").select("*").eq("company_id", company_id).execute()
+        accounts = accounts_resp.data or []
+        account_count = len(accounts)
 
-        # 2. Journal Entry Summary
-        total_journal_entries = len(journals)
-        total_debits = 0
-        total_credits = 0
+        journals_resp = table("journal_entries").select("*, journal_lines(*)").eq("company_id", company_id).execute()
+        journals = journals_resp.data or []
+        journal_count = len(journals)
 
-        for journal in journals:
-            journal_lines = journal.get("journal_lines", [])
-            for line in journal_lines:
-                total_debits += line.get("debit", 0)
-                total_credits += line.get("credit", 0)
+        # ========== Build financial context ==========
+        financial_context = f"Company: {company_name}\n"
+        financial_context += f"Industry: {industry}\n"
+        if location:
+            financial_context += f"Location: {location}\n"
+        if website:
+            financial_context += f"Website: {website}\n"
+        if business_type:
+            financial_context += f"Business Type: {business_type}\n"
 
-        # Recent journals (last 10)
-        recent_journals = journals[-10:] if len(journals) > 10 else journals
+        financial_context += f"\nFinancial Data: {account_count} accounts, {journal_count} journal entries\n\n"
 
-        # Build context for AI
-        context = f"""Company Financial Data Summary:
+        # Add detailed financial data if available
+        if account_count > 0:
+            account_types = {}
+            for acc in accounts:
+                acc_type = acc.get("account_type", "Unknown")
+                balance = acc.get("current_balance", 0)
+                if acc_type not in account_types:
+                    account_types[acc_type] = {"count": 0, "total": 0, "accounts": []}
+                account_types[acc_type]["count"] += 1
+                account_types[acc_type]["total"] += balance
+                account_types[acc_type]["accounts"].append({
+                    "code": acc.get("account_code", ""),
+                    "name": acc.get("account_name", ""),
+                    "balance": balance
+                })
 
-CHART OF ACCOUNTS:
-- Total Accounts: {len(accounts)}
-"""
+            financial_context += "ACCOUNTS BY TYPE:\n"
+            for acc_type, data in account_types.items():
+                financial_context += f"  {acc_type}: {data['count']} accounts, Total: ${data['total']:,.2f}\n"
+                # Show top 3 accounts
+                sorted_accs = sorted(data['accounts'], key=lambda x: abs(x['balance']), reverse=True)[:3]
+                for acc in sorted_accs:
+                    financial_context += f"    - {acc['code']}: {acc['name']} = ${acc['balance']:,.2f}\n"
 
-        # Add accounts by type
-        for acc_type, data in account_types.items():
-            context += f"\n{acc_type.upper()} Accounts ({data['count']}):\n"
-            context += f"  Total Balance: ${data['total_balance']:.2f}\n"
-            # Show top 5 accounts by balance for this type
-            sorted_accounts = sorted(data['accounts'], key=lambda x: abs(x['balance']), reverse=True)[:5]
-            for acc in sorted_accounts:
-                context += f"  - {acc['code']}: {acc['name']} = ${acc['balance']:.2f}\n"
+        if journal_count > 0:
+            recent = journals[-5:] if len(journals) > 5 else journals
+            financial_context += f"\nRECENT TRANSACTIONS ({len(recent)}):\n"
+            for j in recent:
+                financial_context += f"  - {j.get('entry_date', 'N/A')}: {j.get('memo', 'No memo')}\n"
 
-        context += f"""
-JOURNAL ENTRIES:
-- Total Journal Entries: {total_journal_entries}
-- Total Debits: ${total_debits:.2f}
-- Total Credits: ${total_credits:.2f}
-- Balance Check: {'✓ Balanced' if abs(total_debits - total_credits) < 0.01 else '✗ IMBALANCED'}
+        # ========== Intelligent routing with Perplexity ==========
+        answer = ""
 
-Recent Journal Entries:
-"""
-        for journal in recent_journals:
-            entry_date = journal.get("entry_date", "N/A")
-            memo = journal.get("memo", "No memo")
-            status = journal.get("status", "unknown")
-            context += f"- {entry_date}: {memo} (Status: {status})\n"
+        if perplexity_key:
+            from lib.perplexity_client import PerplexityClient
+            client = PerplexityClient()
 
-            # Show journal lines
-            journal_lines = journal.get("journal_lines", [])
-            for line in journal_lines:
-                # Get account name
-                account_id = line.get("account_id")
-                account_name = "Unknown Account"
-                for acc in accounts:
-                    if acc.get("id") == account_id:
-                        account_name = f"{acc.get('account_code')} - {acc.get('account_name')}"
-                        break
+            question_lower = question.lower()
 
-                debit = line.get("debit", 0)
-                credit = line.get("credit", 0)
-                line_desc = line.get("description", "")
+            # Route 1: Industry benchmarks / "how am I doing?" / comparison
+            if any(kw in question_lower for kw in ["benchmark", "industry average", "industry standard", "how am i doing", "compare", "typical", "normal", "peers"]):
+                print(f"[AI] Routing to: Industry Benchmarks")
 
-                if debit > 0:
-                    context += f"    DR {account_name}: ${debit:.2f}"
+                # Use onboarding data automatically
+                working_industry = industry if industry and industry != "general business" else "small business"
+                # Use full location (city, state) if available, otherwise use state, otherwise default
+                if location:
+                    working_location = location
+                elif location_state:
+                    working_location = location_state
                 else:
-                    context += f"    CR {account_name}: ${credit:.2f}"
-                if line_desc:
-                    context += f" ({line_desc})"
-                context += "\n"
+                    working_location = "United States"
 
-        context += f"\nPeer Benchmark: {peer_context}\n"
+                metrics = ["revenue growth rate", "profit margin", "operating expenses ratio"]
 
-        # Call OpenAI
-        try:
+                result = await client.get_industry_benchmarks(
+                    industry=working_industry,
+                    location=working_location,
+                    metrics=metrics
+                )
+                raw_answer = result.get("answer", "")
+
+                # Two-stage processing: Format with OpenAI
+                if openai_key:
+                    answer = await format_for_dashboard(
+                        raw_response=raw_answer,
+                        context=f"Industry benchmarks for {working_industry} businesses",
+                        openai_key=openai_key
+                    )
+                else:
+                    answer = clean_ai_response(raw_answer)
+
+            # Route 2: Reviews / online presence / social media / reputation
+            elif any(kw in question_lower for kw in ["review", "online", "social media", "reputation", "presence", "find me", "search for"]):
+                print(f"[AI] Routing to: Online Presence Search")
+
+                # Build detailed search prompt with all available context
+                search_prompt = f"""Search for information about {company_name}"""
+                if location:
+                    search_prompt += f" located in {location}"
+                if website:
+                    search_prompt += f" (website: {website})"
+                if industry:
+                    search_prompt += f", a {industry} business"
+
+                search_prompt += f"""
+
+IMPORTANT: Use the website URL and location to identify the CORRECT business. There may be multiple businesses with similar names in different locations.
+
+Find:
+1. Online reviews (Google, Yelp, industry platforms, BBB)
+2. Social media accounts (LinkedIn, Facebook, Instagram, Twitter)
+3. Company website and online visibility
+4. News or press mentions
+5. Customer feedback and ratings
+
+If you cannot find specific information about {company_name} at {website or location}, provide:
+- Guidance on where {industry} businesses should have online presence
+- How to get reviews and improve visibility
+- Examples of similar businesses with strong online presence
+- Actionable steps to build reputation"""
+
+                result = await client.query(
+                    prompt=search_prompt,
+                    system_prompt="""You are a business intelligence analyst. Search the web for factual information.
+If you cannot find specific information, say so and provide general guidance for that industry.""",
+                    temperature=0.2,
+                    max_tokens=600
+                )
+                raw_answer = result.get("answer", "")
+
+                # Two-stage processing: Format with OpenAI
+                if openai_key:
+                    answer = await format_for_dashboard(
+                        raw_response=raw_answer,
+                        context=f"Online presence and reviews for {company_name}",
+                        openai_key=openai_key
+                    )
+                else:
+                    answer = clean_ai_response(raw_answer)
+
+            # Route 3: Growth / expansion / scaling strategies
+            elif any(kw in question_lower for kw in ["grow", "growth", "expand", "scale", "improve", "increase revenue", "get more customers"]):
+                print(f"[AI] Routing to: Growth Recommendations")
+
+                # Use onboarding data automatically - provide defaults if missing
+                working_industry = industry if industry and industry != "general business" else "small business"
+                working_revenue = revenue if revenue > 0 else 250000  # Default $250k
+                working_employees = employees if employees > 0 else 5  # Default 5 employees
+                # Use full location (city, state) if available, otherwise use state, otherwise default
+                if location:
+                    working_location = location
+                elif location_state:
+                    working_location = location_state
+                else:
+                    working_location = "United States"
+
+                result = await client.get_growth_recommendations(
+                    industry=working_industry,
+                    revenue=working_revenue,
+                    employees=working_employees,
+                    growth_stage="growth" if working_revenue > 500000 else "startup",
+                    location=working_location
+                )
+                raw_answer = result.get("answer", "")
+
+                # Two-stage processing: Format with OpenAI
+                if openai_key:
+                    answer = await format_for_dashboard(
+                        raw_response=raw_answer,
+                        context=f"Growth strategies for {working_industry} business",
+                        openai_key=openai_key
+                    )
+                else:
+                    answer = clean_ai_response(raw_answer)
+
+            # Route 4: Competitor analysis
+            elif any(kw in question_lower for kw in ["competitor", "competition", "rival", "other businesses"]):
+                print(f"[AI] Routing to: Competitor Analysis")
+
+                search_prompt = f"""Analyze the competitive landscape for {company_name}"""
+                if website:
+                    search_prompt += f" ({website})"
+                search_prompt += f", a {industry} business"
+                if location:
+                    search_prompt += f" in {location}"
+
+                search_prompt += f"""
+
+IMPORTANT: Focus on competitors in the same geographic area ({location}) and industry ({industry}).
+
+Identify:
+1. Main competitors in the area/industry
+2. Their market positioning and differentiation
+3. Pricing strategies
+4. Online presence and customer reviews
+5. What {company_name} can learn from them
+
+Provide actionable competitive insights."""
+
+                result = await client.query(
+                    prompt=search_prompt,
+                    system_prompt="You are a competitive intelligence analyst. Provide factual market analysis from web sources.",
+                    temperature=0.2,
+                    max_tokens=600
+                )
+                raw_answer = result.get("answer", "")
+
+                # Two-stage processing: Format with OpenAI
+                if openai_key:
+                    answer = await format_for_dashboard(
+                        raw_response=raw_answer,
+                        context=f"Competitive analysis for {company_name}",
+                        openai_key=openai_key
+                    )
+                else:
+                    answer = clean_ai_response(raw_answer)
+
+            # Route 5: Financial data questions (if they have data)
+            elif account_count > 0 and any(kw in question_lower for kw in ["expense", "revenue", "cash", "profit", "loss", "balance", "account", "transaction", "spending"]):
+                print(f"[AI] Routing to: Financial Data Analysis")
+
+                # Calculate peer context if possible
+                revenue_total = 0
+                expense_total = 0
+                for acc in accounts:
+                    acc_type = acc.get("account_type", "").lower()
+                    balance = acc.get("current_balance", 0)
+                    if "revenue" in acc_type or "income" in acc_type:
+                        revenue_total += balance
+                    elif "expense" in acc_type or "cost" in acc_type:
+                        expense_total += balance
+
+                peer_context = build_peer_context(revenue_total, expense_total)
+
+                system_prompt = """You are a financial analyst analyzing accounting data.
+
+CRITICAL RULES:
+1. ONLY reference numbers that are explicitly in the provided data - never estimate or guess
+2. If data is insufficient to answer, say "I need more data" or ask clarifying questions
+3. Keep response under 100 words - be direct and actionable
+4. Reference specific account names/codes when making recommendations
+5. Use plain text only - no markdown formatting"""
+
+                user_prompt = f"""Analyze this financial data and answer:
+
+{financial_context}
+
+QUESTION: {question}
+
+Answer with ONLY information from the data above. If data is insufficient, say so and ask what's needed."""
+
+                result = await client.query(
+                    prompt=user_prompt,
+                    system_prompt=system_prompt,
+                    temperature=0.3,
+                    max_tokens=600
+                )
+                answer = result.get("answer", "")
+                answer = clean_ai_response(answer, peer_context)
+
+            # Route 6: General business questions (catch-all)
+            else:
+                print(f"[AI] Routing to: General Business Advice")
+
+                context_prompt = f"I run {company_name}"
+                if website:
+                    context_prompt += f" ({website})"
+                context_prompt += f", a {industry} business"
+                if location:
+                    context_prompt += f" in {location}"
+                context_prompt += f". {question}"
+
+                result = await client.query(
+                    prompt=context_prompt,
+                    system_prompt="You are a business advisor. Provide practical, actionable advice backed by current web information.",
+                    temperature=0.2,
+                    max_tokens=600
+                )
+                raw_answer = result.get("answer", "")
+
+                # Two-stage processing: Format with OpenAI
+                if openai_key:
+                    answer = await format_for_dashboard(
+                        raw_response=raw_answer,
+                        context="General business advice",
+                        openai_key=openai_key
+                    )
+                else:
+                    answer = clean_ai_response(raw_answer)
+
+        else:
+            # Fallback to OpenAI (limited - no web search)
+            print(f"[AI] Using OpenAI fallback (no web search)")
             from openai import OpenAI
-            client = OpenAI(api_key=openai_key)
+            openai_client = OpenAI(api_key=openai_key)
 
-            system_prompt = """You are a helpful, friendly AI accountant companion for a small business.
-Your role is to help the user understand their financial data, identify trends, and make informed decisions.
+            system_prompt = "You are a business and financial advisor. Provide clear, actionable advice. Use plain text only."
+            user_prompt = f"{financial_context}\n\nQUESTION: {question}\n\nProvide helpful advice even if financial data is limited. Use plain text only."
 
-Be conversational, warm, and encouraging. Use clear language without too much jargon or markdown formatting.
-When discussing numbers, be specific and helpful. Offer insights and suggestions when appropriate.
-
-Think of yourself as a knowledgeable friend who happens to be great with numbers and finances."""
-
-            user_prompt = f"""Based on the following financial data, please answer the user's question:
-
-{context}
-
-User's Question: {question}
-
-Provide a crisp, two-paragraph response with short sentences. Avoid markdown styling, keep the tone confident, and explicitly reference the peer benchmark in your final sentence so the reader understands how they compare to similar companies."""
-
-            response = client.chat.completions.create(
+            response = openai_client.chat.completions.create(
                 model="gpt-4o-mini",
                 messages=[
                     {"role": "system", "content": system_prompt},
                     {"role": "user", "content": user_prompt}
                 ],
-                temperature=0.7,
-                max_tokens=500
+                temperature=0.3,
+                max_tokens=600
             )
 
-            raw_answer = response.choices[0].message.content
-            answer = clean_ai_response(raw_answer, peer_context)
+            answer = response.choices[0].message.content
 
-            return {
-                "answer": answer,
-                "account_count": len(accounts),
-                "journal_count": total_journal_entries,
-                "total_debits": total_debits,
-                "total_credits": total_credits
-            }
-
-        except Exception as e:
-            raise HTTPException(status_code=500, detail=f"OpenAI API error: {str(e)}")
+        return {
+            "answer": answer.strip(),
+            "account_count": account_count,
+            "journal_count": journal_count
+        }
 
     except HTTPException:
         raise
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Error processing AI query: {str(e)}")
+        print(f"[AI] Error: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=str(e))

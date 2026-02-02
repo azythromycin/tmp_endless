@@ -7,11 +7,11 @@ import NewSidebar from './NewSidebar'
 import AskAIButton from './AskAIButton'
 import { useTheme } from '@/contexts/ThemeContext'
 
-const publicRoutes = ['/', '/login', '/signup', '/onboarding', '/auth/callback']
+const publicRoutes = ['/', '/login', '/signup', '/auth/callback']
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname()
-  const isPublicRoute = publicRoutes.some(route => pathname.startsWith(route))
+  const isPublicRoute = pathname === '/' || publicRoutes.slice(1).some(route => pathname.startsWith(route))
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
   const sidebarWidth = useMemo(() => (sidebarCollapsed ? 96 : 280), [sidebarCollapsed])
   const { theme, toggleTheme } = useTheme()

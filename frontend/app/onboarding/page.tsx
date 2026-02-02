@@ -67,6 +67,7 @@ export default function OnboardingPage() {
     // Step 1: Company Basics
     name: '',
     industry: '',
+    website: '',
     location_city: '',
     location_state: '',
     location_country: 'USA',
@@ -397,6 +398,24 @@ export default function OnboardingPage() {
 
               <div>
                 <label className="block text-sm font-medium mb-2" style={{ color: 'var(--text-primary)' }}>
+                  Website <span className="text-xs" style={{ color: 'var(--text-muted)' }}>(optional - improves AI accuracy)</span>
+                </label>
+                <input
+                  type="url"
+                  value={formData.website}
+                  onChange={(e) => handleInputChange('website', e.target.value)}
+                  className="w-full px-4 py-3 rounded-lg focus:outline-none focus:ring-2 transition-all"
+                  style={{
+                    backgroundColor: 'var(--bg-primary)',
+                    border: '1px solid var(--border-color)',
+                    color: 'var(--text-primary)'
+                  }}
+                  placeholder="https://example.com"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium mb-2" style={{ color: 'var(--text-primary)' }}>
                   Industry <span style={{ color: 'var(--neon-fuchsia)' }}>*</span>
                 </label>
                 <select
@@ -458,7 +477,7 @@ export default function OnboardingPage() {
               </div>
 
               <p className="text-xs" style={{ color: 'var(--text-muted)' }}>
-                This helps us provide relevant industry benchmarks and tax information.
+                Your location helps us provide relevant industry benchmarks and tax information. Adding your website helps our AI identify your business accurately for online presence insights.
               </p>
             </div>
           )}
