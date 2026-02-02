@@ -1,16 +1,17 @@
 FROM python:3.11-slim
 
-# Install system dependencies for OCR
-RUN apt-get update && apt-get install -y \
-    libgl1 \
-    libglib2.0-0 \
-    libsm6 \
-    libxext6 \
-    libxrender1 \
-    libgomp1 \
-    poppler-utils \
-    libopencv-dev \
-    && rm -rf /var/lib/apt/lists/*
+# OCR system dependencies commented out for faster deployment
+# Uncomment when you need OCR:
+# RUN apt-get update && apt-get install -y \
+#     libgl1 \
+#     libglib2.0-0 \
+#     libsm6 \
+#     libxext6 \
+#     libxrender1 \
+#     libgomp1 \
+#     poppler-utils \
+#     libopencv-dev \
+#     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
 
