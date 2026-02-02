@@ -20,11 +20,10 @@ openai==1.10.0
 # Data Processing
 pydantic==2.5.3
 
-# OCR (Optional - for receipt parsing) - COMMENTED OUT FOR FASTER DEPLOYMENT
-# Uncomment these when you need OCR functionality:
-# easyocr==1.7.0
-# pdf2image==1.17.0
-# Pillow==10.2.0
+# OCR (for receipt parsing)
+easyocr==1.7.0
+pdf2image==1.17.0
+Pillow==10.2.0
 
 # Utilities
 python-dateutil==2.8.2
