@@ -14,7 +14,9 @@ app.add_middleware(
         "http://localhost:3002",
         "http://127.0.0.1:3000",
         "http://127.0.0.1:3001",
-        "http://127.0.0.1:3002"
+        "http://127.0.0.1:3002",
+        "https://*.vercel.app",  # Allow all Vercel deployments
+        "https://endless-accounting.vercel.app",  # Your production URL
     ],
     allow_credentials=True,
     allow_methods=["*"],
