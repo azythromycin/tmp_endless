@@ -74,7 +74,7 @@ export default function NewJournals() {
         id: acc.id,
         code: acc.account_code,
         name: acc.account_name,
-        type: acc.type
+        type: acc.account_type
       }))
       setAccounts(accountsData)
     } catch (error) {
@@ -158,34 +158,41 @@ export default function NewJournals() {
     formData.append('file', file)
 
     try {
-      const response = await api.post('/parse', formData, {
-        headers: { 'Content-Type': 'multipart/form-data' }
-      })
+      const response = await api.postFormData<{
+        parsed_fields: { vendor?: string; date?: string; total?: string; amount?: number; memo?: string; invoice_number?: string }
+      }>('/parse/', formData)
 
-      const { extracted_data } = response.data
+      const pf = response?.parsed_fields || {}
+      const amount = typeof pf.amount === 'number' ? pf.amount : (typeof pf.total === 'string' ? parseFloat(pf.total.replace(/[,$]/g, '')) || 0 : 0)
+      const dateNorm = pf.date ? (pf.date.includes('-') && pf.date.length >= 10 ? pf.date : (() => {
+        const parts = pf.date!.split(/[/-]/)
+        const [m, d, y] = parts
+        if (!y) return journalEntry.date
+        const yy = y.length === 2 ? `20${y}` : y
+        return `${yy}-${(m || '').padStart(2, '0')}-${(d || '').padStart(2, '0')}`
+      })()) : journalEntry.date
 
-      // Auto-populate journal entry from OCR
       setJournalEntry({
         ...journalEntry,
-        memo: extracted_data.memo || extracted_data.vendor || '',
-        referenceNumber: extracted_data.invoice_number || '',
-        date: extracted_data.date || journalEntry.date,
+        memo: pf.memo || pf.vendor || '',
+        referenceNumber: pf.invoice_number || '',
+        date: dateNorm,
         attachedFile: file,
         lines: [
           {
             id: Date.now().toString(),
             accountId: '',
             accountName: '',
-            description: extracted_data.vendor || 'Expense',
+            description: pf.vendor || 'Expense',
             debit: 0,
-            credit: extracted_data.amount || 0
+            credit: amount
           },
           {
             id: (Date.now() + 1).toString(),
             accountId: '',
             accountName: '',
             description: 'Cash payment',
-            debit: extracted_data.amount || 0,
+            debit: amount,
             credit: 0
           }
         ]

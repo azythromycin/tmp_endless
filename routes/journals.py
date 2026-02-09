@@ -163,8 +163,14 @@ def create_journal_entry(entry: JournalEntryCreate, auth: Dict[str, str] = Depen
                     .eq("id", line.account_id)\
                     .execute()
 
-        # Fetch the complete entry with lines
-        return get_journal_entry(journal_entry["id"])
+        # Fetch the complete entry with lines (same shape as GET /journals/{id})
+        full = supabase.table("journal_entries")\
+            .select("*, journal_lines(*, accounts(account_code, account_name))")\
+            .eq("id", journal_entry["id"])\
+            .eq("company_id", company_id)\
+            .single()\
+            .execute()
+        return full.data if full.data else journal_entry
     except HTTPException:
         raise
     except Exception as e:

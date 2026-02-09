@@ -111,7 +111,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
       if (data.user) {
         // Create user record via backend API (uses service_role key, bypasses RLS)
-        const response = await fetch(`${process.env.NEXT_PUBLIC_API_BASE}/users/`, {
+        const apiBase = process.env.NEXT_PUBLIC_API_BASE || 'http://localhost:8000'
+        const response = await fetch(`${apiBase}/users/`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
