@@ -1,7 +1,7 @@
-from fastapi import APIRouter, HTTPException, Depends
+from fastapi import APIRouter, HTTPException, Depends, Header
 from database import table, supabase
 from typing import Dict, Optional
-from middleware.auth import get_current_user_company, require_role, verify_token
+from middleware.auth import get_current_user_company, require_role, verify_token, ensure_user_row_from_token
 
 router = APIRouter(prefix="/companies", tags=["Companies"])
 
@@ -19,16 +19,21 @@ def get_companies_with_users():
 
 # Get authenticated user's company (works for users with or without companies)
 @router.get("/")
-async def get_all_companies(user_id: str = Depends(verify_token)):
+async def get_all_companies(
+    authorization: Optional[str] = Header(None),
+    user_id: str = Depends(verify_token)
+):
     try:
-        # Get user's company_id
-        user_response = supabase.table("users").select("company_id").eq("id", user_id).single().execute()
+        user_response = supabase.table("users").select("company_id").eq("id", user_id).limit(1).execute()
 
-        if not user_response.data or not user_response.data.get("company_id"):
-            # User has no company yet (onboarding not complete)
+        if not user_response.data:
+            ensure_user_row_from_token(authorization)
+            user_response = supabase.table("users").select("company_id").eq("id", user_id).limit(1).execute()
+
+        if not user_response.data or not user_response.data[0].get("company_id"):
             return {"status": "success", "data": []}
 
-        company_id = user_response.data["company_id"]
+        company_id = user_response.data[0]["company_id"]
         response = table("companies").select("*").eq("id", company_id).execute()
         return {"status": "success", "data": response.data}
     except Exception as e:
@@ -70,28 +75,38 @@ def create_company(company: dict):
 
 # Update a company
 @router.patch("/{company_id}")
-async def update_company(company_id: str, update_data: dict, user_id: str = Depends(verify_token)):
+async def update_company(
+    company_id: str,
+    update_data: dict,
+    authorization: Optional[str] = Header(None),
+    user_id: str = Depends(verify_token)
+):
     try:
-        # Get user's current company_id (if any)
-        user_response = supabase.table("users").select("company_id, id").eq("id", user_id).single().execute()
+        user_response = supabase.table("users").select("company_id, id").eq("id", user_id).limit(1).execute()
+
+        if not user_response.data:
+            ensure_user_row_from_token(authorization)
+            user_response = supabase.table("users").select("company_id, id").eq("id", user_id).limit(1).execute()
 
         if not user_response.data:
             raise HTTPException(status_code=404, detail="User not found")
 
-        user_company_id = user_response.data.get("company_id")
+        user_company_id = user_response.data[0].get("company_id")
 
-        # During onboarding, user_company_id might be None
-        # Verify the company exists
-        company_response = supabase.table("companies").select("id").eq("id", company_id).execute()
+        # Verify the company exists and get onboarding status
+        company_response = supabase.table("companies").select("id, onboarding_completed").eq("id", company_id).limit(1).execute()
 
         if not company_response.data:
             raise HTTPException(status_code=404, detail="Company not found")
 
+        company_row = company_response.data[0]
+        company_still_in_onboarding = company_row.get("onboarding_completed") is False
+
         # Allow update if:
         # 1. User's company_id matches (already onboarded), OR
-        # 2. User created this company (during onboarding)
-        if user_company_id and user_company_id != company_id:
-            # User has a different company assigned
+        # 2. User has no company yet (onboarding), OR
+        # 3. Company is still in onboarding (user may have just created it; link may not be set yet)
+        if user_company_id and user_company_id != company_id and not company_still_in_onboarding:
             raise HTTPException(status_code=403, detail="Cannot update another company")
 
         # Update the company
@@ -99,8 +114,8 @@ async def update_company(company_id: str, update_data: dict, user_id: str = Depe
         if not response.data:
             raise HTTPException(status_code=404, detail="Company not found.")
 
-        # If user doesn't have a company_id yet, set it now
-        if not user_company_id:
+        # Link user to this company if not already linked (first time or was linked to different one during onboarding)
+        if not user_company_id or (company_still_in_onboarding and user_company_id != company_id):
             supabase.table("users").update({"company_id": company_id}).eq("id", user_id).execute()
 
         return {"status": "success", "data": response.data}

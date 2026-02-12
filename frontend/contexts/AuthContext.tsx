@@ -29,27 +29,34 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const fetchUserData = async (authUser: SupabaseUser) => {
     if (!supabase) return
     try {
-      // Fetch user data from the users table
+      // Fetch user data from the users table (maybeSingle: no row yet after signup is ok)
       const { data: userData, error: userError } = await supabase
         .from('users')
         .select('*')
         .eq('id', authUser.id)
-        .single()
+        .maybeSingle()
 
       if (userError) throw userError
+      if (!userData) {
+        setUser(null)
+        setCompany(null)
+        return
+      }
 
       setUser(userData)
 
-      // Fetch company data if user has a company
+      // Fetch company data if user has a company (maybeSingle: no company yet before onboarding is ok)
       if (userData.company_id) {
         const { data: companyData, error: companyError } = await supabase
           .from('companies')
           .select('*')
           .eq('id', userData.company_id)
-          .single()
+          .maybeSingle()
 
         if (companyError) throw companyError
-        setCompany(companyData)
+        setCompany(companyData ?? null)
+      } else {
+        setCompany(null)
       }
     } catch (error) {
       console.error('Error fetching user data:', error)
@@ -89,7 +96,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const signUp = async (email: string, password: string, fullName: string) => {
     if (!supabase) {
-      throw new Error('Supabase client not configured.')
+      throw new Error(
+        'Authentication requires Supabase. Add NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY to .env.local, set NEXT_PUBLIC_DEMO_MODE=false, and restart the dev server. Get keys from Supabase Dashboard → Project Settings → API.'
+      )
     }
     try {
       const redirectUrl = typeof window !== 'undefined'
@@ -140,7 +149,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const signIn = async (email: string, password: string) => {
     if (!supabase) {
-      throw new Error('Supabase client not configured.')
+      throw new Error(
+        'Authentication requires Supabase. Add NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY to .env.local, set NEXT_PUBLIC_DEMO_MODE=false, and restart the dev server. Get keys from Supabase Dashboard → Project Settings → API.'
+      )
     }
     try {
       const { data, error } = await supabase.auth.signInWithPassword({
@@ -153,12 +164,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       if (data.user) {
         await fetchUserData(data.user)
 
-        // Check if user has completed onboarding
+        // Check if user has completed onboarding (maybeSingle: user/company row may not exist yet)
         const { data: userData } = await supabase
           .from('users')
           .select('company_id, companies(onboarding_completed)')
           .eq('id', data.user.id)
-          .single()
+          .maybeSingle()
 
         if (!userData?.company_id) {
           router.push('/onboarding')

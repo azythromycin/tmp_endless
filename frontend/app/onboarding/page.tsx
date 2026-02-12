@@ -184,20 +184,20 @@ export default function OnboardingPage() {
 
       if (companyId) {
         await api.patch(`/companies/${companyId}`, updateData)
+        await refreshUser()
       } else {
         const response = await api.post('/companies/', updateData)
 
-        // Backend returns { status: "success", data: [...] }
         if (response.status === 'success' && response.data && response.data.length > 0) {
           const newCompanyId = response.data[0].id
           setCompanyId(newCompanyId)
 
-          // Update user with company_id
           if (user) {
             await api.patch(`/users/${user.id}`, {
               company_id: newCompanyId
             })
           }
+          await refreshUser()
         } else {
           throw new Error('Failed to create company')
         }

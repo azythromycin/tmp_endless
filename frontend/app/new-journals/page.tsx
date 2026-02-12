@@ -56,7 +56,10 @@ export default function NewJournals() {
   const resetEntry = () => setJournalEntry(createEmptyEntry())
 
   useEffect(() => {
-    if (!companyId) return
+    if (!companyId) {
+      setLoading(false)
+      return
+    }
     fetchAccounts(companyId)
     fetchRecentJournals(companyId)
   }, [companyId])
@@ -276,8 +279,18 @@ export default function NewJournals() {
 
   if (!companyId) {
     return (
-      <div className="flex items-center justify-center h-screen bg-gray-50 dark:bg-slate-950">
-        <Loader2 className="w-8 h-8 text-fuchsia-500 dark:text-fuchsia-300 animate-spin" />
+      <div className="flex flex-col items-center justify-center min-h-[60vh] p-8 text-center">
+        <FileText className="w-16 h-16 text-gray-400 dark:text-white/30 mb-4" />
+        <h2 className="text-xl font-semibold text-gray-900 dark:text-white mb-2">No company set up yet</h2>
+        <p className="text-gray-600 dark:text-white/60 max-w-md mb-6">
+          Finish onboarding and link your company to use journals.
+        </p>
+        <a
+          href="/onboarding"
+          className="px-4 py-2 rounded-full bg-gradient-to-r from-fuchsia-500 to-indigo-500 text-sm font-semibold text-white"
+        >
+          Complete onboarding
+        </a>
       </div>
     )
   }
