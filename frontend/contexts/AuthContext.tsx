@@ -45,7 +45,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
       setUser(userData)
 
-      // Fetch company data if user has a company (maybeSingle: no company yet before onboarding is ok)
+      // Fetch company: try Supabase first; if RLS blocks read, fall back to backend API so company shows after onboarding
       if (userData.company_id) {
         const { data: companyData, error: companyError } = await supabase
           .from('companies')
@@ -54,7 +54,20 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           .maybeSingle()
 
         if (companyError) throw companyError
-        setCompany(companyData ?? null)
+        if (companyData) {
+          setCompany(companyData)
+        } else {
+          try {
+            const res = await api.get<{ data?: any[] }>('/companies/')
+            if (res?.data && res.data.length > 0) {
+              setCompany(res.data[0])
+            } else {
+              setCompany(null)
+            }
+          } catch {
+            setCompany(null)
+          }
+        }
       } else {
         setCompany(null)
       }

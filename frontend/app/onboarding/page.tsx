@@ -56,7 +56,7 @@ export default function OnboardingPage() {
   const router = useRouter()
   const { user, refreshUser } = useAuth()
   const { theme, toggleTheme } = useTheme()
-  const [step, setStep] = useState(1)
+  const [step, setStep] = useState(0) // 0 = landing, 1–4 = form steps
   const [loading, setLoading] = useState(false)
   const [initialLoading, setInitialLoading] = useState(true)
   const [companyId, setCompanyId] = useState('')
@@ -103,21 +103,22 @@ export default function OnboardingPage() {
         const response = await api.get('/companies/')
         if (response.data && response.data.length > 0) {
           const company = response.data[0]
+          if (company.onboarding_completed) {
+            router.replace('/new-dashboard')
+            return
+          }
           setCompanyId(company.id)
-
-          // Pre-fill form if data exists
           setFormData(prev => ({
             ...prev,
             ...company,
             primary_products: company.primary_products || [],
             competitors: company.competitors || []
           }))
-
-          // Resume from last step if onboarding not completed
-          if (!company.onboarding_completed && company.onboarding_step) {
-            setStep(Math.min(company.onboarding_step, 3)) // Don't go to step 4 automatically
+          if (company.onboarding_step) {
+            setStep(Math.min(company.onboarding_step, 4))
           }
         }
+        // No company = first time; stay on step 0 (landing)
       } catch (error) {
         console.error('Failed to load company data:', error)
       } finally {
@@ -213,21 +214,27 @@ export default function OnboardingPage() {
     }
   }
 
+  const startOnboarding = () => {
+    setStep(1)
+    setError('')
+  }
+
   const nextStep = async () => {
-    // Optimistic UI - immediately show next step
     const nextStepNum = step + 1
     setStep(nextStepNum)
 
-    // Save in background
-    const success = await saveProgress(nextStepNum)
-    if (!success) {
-      // Revert on failure
-      setStep(step)
+    if (nextStepNum <= 4) {
+      const success = await saveProgress(nextStepNum)
+      if (!success) setStep(step)
     }
   }
 
   const prevStep = () => {
-    setStep(step - 1)
+    if (step === 1) {
+      setStep(0) // Back to landing
+    } else {
+      setStep(step - 1)
+    }
     setError('')
   }
 
@@ -243,13 +250,13 @@ export default function OnboardingPage() {
   }
 
   const canProceed = useCallback(() => {
+    if (step === 0) return true
     switch (step) {
       case 1:
         return !!(formData.name && formData.industry && formData.location_city && formData.location_state)
       case 2:
         return !!(formData.business_type && formData.growth_stage)
       case 3:
-        return true // Optional fields
       case 4:
         return true
       default:
@@ -257,7 +264,7 @@ export default function OnboardingPage() {
     }
   }, [step, formData])
 
-  const StepIcon = STEP_INFO[step - 1]?.icon || Building2
+  const StepIcon = step >= 1 ? (STEP_INFO[step - 1]?.icon || Building2) : Building2
 
   if (!mounted || initialLoading) {
     return (
@@ -321,9 +328,43 @@ export default function OnboardingPage() {
             : '0 20px 60px rgba(0, 0, 0, 0.1)'
         }}
       >
+        {/* Step 0: Onboarding landing page */}
+        {step === 0 && (
+          <div className="text-center py-6">
+            <div
+              className="inline-flex p-4 rounded-2xl mb-6"
+              style={{
+                backgroundColor: theme === 'dark' ? 'rgba(34, 211, 238, 0.1)' : 'rgba(34, 211, 238, 0.15)',
+                border: '1px solid var(--neon-cyan)'
+              }}
+            >
+              <Building2 className="w-12 h-12" style={{ color: 'var(--neon-cyan)' }} />
+            </div>
+            <h1 className="text-2xl md:text-3xl font-bold mb-3" style={{ color: 'var(--text-primary)' }}>
+              Set up your company
+            </h1>
+            <p className="text-base mb-8 max-w-md mx-auto" style={{ color: 'var(--text-secondary)' }}>
+              A few quick steps to connect your business to Endless. We’ll link your account and company so you can use the full app.
+            </p>
+            <button
+              type="button"
+              onClick={startOnboarding}
+              className="px-8 py-3 rounded-xl font-semibold text-white transition-all hover:opacity-90"
+              style={{
+                background: 'linear-gradient(90deg, var(--neon-fuchsia), var(--neon-cyan))',
+                boxShadow: '0 10px 40px rgba(217, 70, 239, 0.3)'
+              }}
+            >
+              Get started
+            </button>
+          </div>
+        )}
+
+        {/* Steps 1–4: Form */}
+        {step >= 1 && (
+          <>
         {/* Progress Header */}
         <div className="mb-8">
-          {/* Step indicator pills */}
           <div className="flex gap-2 mb-4">
             {[1, 2, 3, 4].map(i => (
               <div
@@ -338,7 +379,6 @@ export default function OnboardingPage() {
             ))}
           </div>
 
-          {/* Step info */}
           <div className="flex items-center gap-4">
             <div
               className="p-3 rounded-xl transition-colors"
@@ -789,7 +829,7 @@ export default function OnboardingPage() {
 
         {/* Navigation Buttons */}
         <div className="flex justify-between gap-4">
-          {step > 1 && step < 4 && (
+          {step >= 1 && step < 4 && (
             <button
               onClick={prevStep}
               className="px-5 py-2.5 rounded-lg font-medium transition-all flex items-center gap-2"
@@ -863,6 +903,8 @@ export default function OnboardingPage() {
           <p className="text-xs text-center mt-4" style={{ color: 'var(--neon-fuchsia)' }}>
             Please fill in all required fields marked with *
           </p>
+        )}
+          </>
         )}
       </div>
     </div>
